@@ -4,8 +4,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "fetch-parse": "node Fetchmail.js && node parser.js",
-    "start" : "npm run fetch-parse"
+    "fetch-parse": "npm run fetch && npm run parse && npm run sheet",
+    "fetch": "node fetchMail.js",
+    "parse": "node parser.js",
+    "sheet": "node updateSheet.js",
+    "start": "npm run fetch-parse"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +16,8 @@
   "description": "",
   "dependencies": {
     "dotenv": "^16.5.0",
+    "google-spreadsheet": "^4.1.4",
+    "googleapis": "^148.0.0",
     "imap": "^0.8.19",
     "mailparser": "^3.7.2",
     "pdf-parse": "^1.1.1"

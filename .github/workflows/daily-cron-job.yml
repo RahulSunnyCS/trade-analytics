@@ -1,33 +1,59 @@
-name: Daily Cron Job at 4 PM
+name: Daily Trading Data Processing
 
 on:
   schedule:
-    # This schedule will trigger the job at 4 PM UTC every day
-    - cron: "0 16 * * *"
+    - cron: "0 10 * * 2-6"
+  workflow_dispatch:
 
 jobs:
   run-scripts:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the code from the repository
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # Set up Node.js (make sure to use the version your app is using)
+      - name: Download row-tracker from previous successful workflow run (if exists)
+        run: |
+          echo "Trying to find latest row-tracker artifact..."
+
+          ARTIFACT_INFO=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts")
+
+          ARTIFACT_ID=$(echo "$ARTIFACT_INFO" | jq -r '.artifacts[] | select(.name=="row-tracker") | .id' | head -n 1)
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "No previous artifact found, proceeding without it."
+          else
+            echo "Found artifact ID: $ARTIFACT_ID"
+            curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -o artifact.zip \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
+            
+            unzip artifact.zip
+          fi
+        shell: bash
+
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: "14"
+          node-version: "20"
 
-      # Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # Run the fetchmail.js script
-      - name: Run fetchmail.js
-        run: node fetchmail.js
+      - name: Run Fetch and Parse
+        run: npm run start
+        env:
+          EMAILS: ${{ secrets.EMAILS }}
+          PASSWORDS: ${{ secrets.PASSWORDS }}
+          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          SHEET_GID: ${{ secrets.SHEET_GID }}
 
-      # Run the parser.js script
-      - name: Run parser.js
-        run: node parser.js
+      - name: Upload updated row_tracker.json as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: row-tracker
+          path: row_tracker.json
