@@ -51,6 +51,7 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_GID: ${{ secrets.SHEET_GID }}
+          SHEET_NAME: ${{ secrets.SHEET_NAME }}
 
       - name: Upload updated row_tracker.json as artifact
         uses: actions/upload-artifact@v4
