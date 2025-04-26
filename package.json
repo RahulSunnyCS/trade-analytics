@@ -1,0 +1,19 @@
+{
+  "name": "shoonya-contract-parser",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "fetch-parse": "node Fetchmail.js && node parser.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "imap": "^0.8.19",
+    "mailparser": "^3.7.2",
+    "pdf-parse": "^1.1.1"
+  }
+}
