@@ -1,0 +1,33 @@
+name: Daily Cron Job at 4 PM
+
+on:
+  schedule:
+    # This schedule will trigger the job at 4 PM UTC every day
+    - cron: "0 16 * * *"
+
+jobs:
+  run-scripts:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Set up Node.js (make sure to use the version your app is using)
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Run the fetchmail.js script
+      - name: Run fetchmail.js
+        run: node fetchmail.js
+
+      # Run the parser.js script
+      - name: Run parser.js
+        run: node parser.js
