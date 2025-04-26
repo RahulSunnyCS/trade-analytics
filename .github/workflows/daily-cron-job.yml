@@ -57,3 +57,9 @@ jobs:
         with:
           name: row-tracker
           path: row_tracker.json
+
+      - name: Delete old artifacts
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: "1 day"
+          skip-recent: 3
