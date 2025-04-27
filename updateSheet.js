@@ -60,10 +60,10 @@ async function updateGoogleSheet() {
           ).data.values[0][0]
         : 0;
 
-    // --- Step 4: Set newRow as the previous row value + 1 (or 1 if no value in previous row)
-    const newRow = lastRowValue ? parseInt(lastRowValue) + 1 : 1;
+    // --- Step 4: Set newRow as the previous row value + 1
+    const newRow = lastRow ? parseInt(lastRow) + 1 : 1;
+    const newRowValue = lastRowValue ? parseInt(lastRowValue) + 1 : 1;
 
-    // Insert the new row
     const insertRequest = {
       spreadsheetId,
       resource: {
@@ -76,7 +76,7 @@ async function updateGoogleSheet() {
                 startIndex: newRow - 1,
                 endIndex: newRow,
               },
-              inheritFromBefore: false, // Don't inherit from the row above
+              inheritFromBefore: false,
             },
           },
         ],
@@ -109,7 +109,7 @@ async function updateGoogleSheet() {
 
     const values = [
       [
-        newRow, // Sl No (use newRow for dynamic numbering)
+        newRowValue,
         dayName,
         dateFormatted,
         sellAlgo,
