@@ -73,3 +73,42 @@ GOOGLE_SHEET_ID=your_google_sheet_id_here
 SHEET_GID=your_sheet_gid_here
 SHEET_NAME=your_sheet_name_here
 ```
+
+---
+
+## Adding Environment Variables to GitHub Actions
+
+To use this project with **GitHub Actions**, make sure you add the environment variables as **GitHub Secrets**:
+
+### Steps:
+
+1. Go to your GitHub repository.
+2. Navigate to **Settings** → **Secrets and variables** → **Actions**.
+3. Click **"New repository secret"**.
+4. Add each of the following as separate secrets:
+
+| GitHub Secret Name   | Corresponds to .env Variable |
+| -------------------- | ---------------------------- |
+| `EMAILS`             | `EMAILS`                     |
+| `PASSWORDS`          | `PASSWORDS`                  |
+| `ACCOUNT_IDS`        | `ACCOUNT_IDS`                |
+| `GOOGLE_CREDENTIALS` | `GOOGLE_CREDENTIALS`         |
+| `GOOGLE_SHEET_ID`    | `GOOGLE_SHEET_ID`            |
+| `SHEET_GID`          | `SHEET_GID`                  |
+| `SHEET_NAME`         | `SHEET_NAME`                 |
+
+### Notes:
+
+- Make sure your GitHub Actions workflow is configured to load these secrets using the `secrets` context.
+- You can access the secrets in your workflow like this:
+
+```yaml
+env:
+  EMAILS: ${{ secrets.EMAILS }}
+  PASSWORDS: ${{ secrets.PASSWORDS }}
+  ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+  GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+  GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+  SHEET_GID: ${{ secrets.SHEET_GID }}
+  SHEET_NAME: ${{ secrets.SHEET_NAME }}
+```
