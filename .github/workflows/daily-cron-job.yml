@@ -2,7 +2,7 @@ name: Daily Trading Data Processing
 
 on:
   schedule:
-    - cron: "0 10 * * 2-6"
+    - cron: "0 10 * * *"
   workflow_dispatch:
 
 permissions:
@@ -46,24 +46,43 @@ jobs:
         run: npm install
 
       - name: Run Fetch and Parse
-        run: npm run start
+        run: npm run fetch && npm run parse
         env:
           EMAILS: ${{ secrets.EMAILS }}
           PASSWORDS: ${{ secrets.PASSWORDS }}
           ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+
+      - name: Check for PDF files and exit if none
+        id: check_pdfs
+        run: |
+          count=$(find ./data -type f -name '*.pdf' | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "📭 No PDF files found. Stopping workflow successfully."
+            exit 0
+          else
+            echo "✅ PDF files found: $count"
+            echo "found_pdfs=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update Google Sheet
+        if: steps.check_pdfs.outputs.found_pdfs == 'true'
+        run: npm run sheet
+        env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_GID: ${{ secrets.SHEET_GID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
 
       - name: Upload updated row_tracker.json as artifact
+        if: steps.check_pdfs.outputs.found_pdfs == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: row-tracker
           path: row_tracker.json
 
       - name: Delete old artifacts
+        if: steps.check_pdfs.outputs.found_pdfs == 'true'
         uses: c-hive/gha-remove-artifacts@v1
         with:
-          age: "1 day"
-          skip-recent: 3
+          age: "2 day"
+          skip-recent: 5
