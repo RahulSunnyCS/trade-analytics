@@ -5,7 +5,7 @@ const pdfParse = require("pdf-parse");
 const dataDir = path.join(__dirname, "data");
 const pdfFiles = fs
   .readdirSync(dataDir)
-  .filter((file) => file.endsWith(".pdf"));
+  .filter((file) => file.endsWith("_decrypted.pdf"));
 
 if (!pdfFiles.length) {
   console.log("📭 No PDF files found in data/");

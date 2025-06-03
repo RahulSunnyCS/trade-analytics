@@ -3,6 +3,7 @@ const Imap = require("imap");
 const { simpleParser } = require("mailparser");
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
 // ⏲️ 24-hour window
 const dateSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -16,11 +17,16 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 const emails = process.env.EMAILS.split(",");
 const passwords = process.env.PASSWORDS.split(",");
 const accountIds = process.env.ACCOUNT_IDS.split(",");
+const pdfPasswords = process.env.PDF_PASSWORDS.split(",");
 
 // 🧪 Sanity check
-if (emails.length !== passwords.length || emails.length !== accountIds.length) {
+if (
+  emails.length !== passwords.length ||
+  emails.length !== accountIds.length ||
+  emails.length !== pdfPasswords.length
+) {
   throw new Error(
-    "EMAILS, PASSWORDS, and ACCOUNT_IDS must be of the same length in .env"
+    "EMAILS, PASSWORDS, ACCOUNT_IDS, and PDF_PASSWORDS must be of the same length in .env"
   );
 }
 
@@ -28,7 +34,26 @@ const accounts = emails.map((email, i) => ({
   email,
   password: passwords[i],
   accountId: accountIds[i],
+  pdfPassword: pdfPasswords[i],
 }));
+
+async function decryptWithQpdf(filePath, password) {
+  const decryptedPath = filePath.replace(/\.pdf$/i, "_decrypted.pdf");
+
+  try {
+    execSync(
+      `qpdf --password='${password}' --decrypt "${filePath}" "${decryptedPath}"`,
+      {
+        stdio: "ignore",
+      }
+    );
+    console.log("🔓 PDF decrypted using qpdf:", decryptedPath);
+    return decryptedPath;
+  } catch (err) {
+    console.error("❌ qpdf failed to decrypt:", filePath, err.message);
+    return null;
+  }
+}
 
 async function processAccount(account) {
   return new Promise((resolve, reject) => {
@@ -88,6 +113,16 @@ async function processAccount(account) {
                       const filePath = path.join(dataDir, filename);
                       fs.writeFileSync(filePath, attachment.content);
                       console.log(`📎 Saved attachment: ${filename}`);
+
+                      const decryptedPath = await decryptWithQpdf(
+                        filePath,
+                        account.pdfPassword
+                      );
+                      if (!decryptedPath) {
+                        console.warn(
+                          `⚠️ Could not decrypt PDF for ${account.email}`
+                        );
+                      }
                     }
                   }
                 });

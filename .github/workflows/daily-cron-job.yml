@@ -2,7 +2,7 @@ name: Daily Trading Data Processing
 
 on:
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
@@ -42,6 +42,9 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install qpdf
+        run: sudo apt-get update && sudo apt-get install -y qpdf
+
       - name: Install dependencies
         run: npm install
 
@@ -51,16 +54,17 @@ jobs:
           EMAILS: ${{ secrets.EMAILS }}
           PASSWORDS: ${{ secrets.PASSWORDS }}
           ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
 
       - name: Check for PDF files and exit if none
         id: check_pdfs
         run: |
-          count=$(find ./data -type f -name '*.pdf' | wc -l)
+          count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
           if [ "$count" -eq 0 ]; then
-            echo "📭 No PDF files found. Stopping workflow successfully."
+            echo "📭 No decrypted PDF files found. Stopping workflow successfully."
             exit 0
           else
-            echo "✅ PDF files found: $count"
+            echo "✅ Decrypted PDF files found: $count"
             echo "found_pdfs=true" >> $GITHUB_OUTPUT
           fi
 
