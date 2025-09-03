@@ -97,11 +97,13 @@ async function updateGoogleSheet() {
       data?.total?.final_net +
       data?.total?.net_brokerage;
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    // Allow overriding the date via TARGET_DATE env variable
+    const targetDate = process.env.TARGET_DATE
+      ? new Date(process.env.TARGET_DATE)
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const dayName = yesterday.toLocaleDateString("en-GB", { weekday: "long" });
-    const dateFormatted = yesterday.toLocaleDateString("en-GB", {
+    const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
+    const dateFormatted = targetDate.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "2-digit",
@@ -163,10 +165,19 @@ async function updateGoogleSheet() {
 
     console.log("✅ Sheet updated successfully!");
 
-    // --- Step 9: Save new lastUpdatedRow to row_tracker.json
+    // --- Step 9: Save trackers with the latest info
     fs.writeFileSync(
       "row_tracker.json",
       JSON.stringify({ lastUpdatedRow: newRow }, null, 2),
+      "utf-8"
+    );
+    fs.writeFileSync(
+      "row_tracker_updated.json",
+      JSON.stringify(
+        { lastUpdatedRow: targetDate.toISOString().slice(0, 10) },
+        null,
+        2
+      ),
       "utf-8"
     );
   } catch (error) {
