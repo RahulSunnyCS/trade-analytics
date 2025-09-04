@@ -49,16 +49,39 @@ async function updateGoogleSheet() {
       console.log("Using last row from Google Sheet:", lastRow);
     }
 
-    // --- Step 3: Get the value of the last row in Column A
-    const lastRowValue =
+    // --- Step 3: Determine target date and check for duplicates
+    const targetDate = process.env.TARGET_DATE
+      ? new Date(process.env.TARGET_DATE)
+      : (() => {
+          const d = new Date();
+          d.setDate(d.getDate() - 1);
+          return d;
+        })();
+
+    const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
+    const dateFormatted = targetDate.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "2-digit",
+    });
+
+    const lastRowData =
       lastRow > 0
         ? (
             await sheets.spreadsheets.values.get({
               spreadsheetId,
-              range: `${sheetName}!A${lastRow}:${lastRow}`,
+              range: `${sheetName}!A${lastRow}:C${lastRow}`,
             })
-          ).data.values[0][0]
-        : 0;
+          ).data.values[0]
+        : [];
+
+    const lastRowValue = lastRowData[0] || 0;
+    const lastDateCell = lastRowData[2];
+
+    if (lastDateCell === dateFormatted) {
+      console.log(`Date ${dateFormatted} already exists. Skipping update.`);
+      return;
+    }
 
     // --- Step 4: Set newRow as the previous row value + 1
     const newRow = lastRow ? parseInt(lastRow) + 1 : 1;
@@ -96,21 +119,6 @@ async function updateGoogleSheet() {
       data?.total?.payin_payout_obligation -
       data?.total?.final_net +
       data?.total?.net_brokerage;
-
-    const targetDate = process.env.TARGET_DATE
-      ? new Date(process.env.TARGET_DATE)
-      : (() => {
-          const d = new Date();
-          d.setDate(d.getDate() - 1);
-          return d;
-        })();
-
-    const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
-    const dateFormatted = targetDate.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "2-digit",
-    });
 
     const values = [
       [
