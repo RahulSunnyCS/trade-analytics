@@ -48,6 +48,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Check sheet dates
+        run: npm run check-dates
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          SHEET_NAME: ${{ secrets.SHEET_NAME }}
+
       - name: Run Fetch and Parse
         run: npm run fetch && npm run parse
         env:

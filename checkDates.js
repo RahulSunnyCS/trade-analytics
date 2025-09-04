@@ -6,6 +6,7 @@ const fs = require('fs');
 dotenv.config();
 
 async function logMissingDates() {
+  console.log('Check date started');
   // Decode credentials
   const credentials = JSON.parse(
     Buffer.from(process.env.GOOGLE_CREDENTIALS, 'base64').toString('utf8')
