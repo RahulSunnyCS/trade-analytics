@@ -33,7 +33,7 @@ jobs:
               -o artifact.zip \
               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
             
-            unzip artifact.zip
+            unzip -o artifact.zip
           fi
         shell: bash
 
