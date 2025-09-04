@@ -32,10 +32,8 @@ jobs:
             curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -o artifact.zip \
               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
-
+            
             unzip artifact.zip
-            mv row-tracker/* .
-            rm -rf row-tracker artifact.zip
           fi
         shell: bash
 
@@ -49,77 +47,45 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-      
-      - name: Determine dates to process
-        id: dates
-        run: |
-          > dates.txt
-          if [ -f row_tracker_updated.json ]; then
-            LAST_DATE=$(jq -r '.lastUpdatedRow' row_tracker_updated.json)
-          else
-            LAST_DATE=$(date -I -d "yesterday")
-          fi
-          START=$(date -I -d "$LAST_DATE + 1 day")
-          END=$(date -I)
-          d=$START
-          while [ "$(date -d "$d" +%s)" -le "$(date -d "$END" +%s)" ]; do
-            echo "$d" >> dates.txt
-            d=$(date -I -d "$d + 1 day")
-          done
-          cat dates.txt
 
       - name: Run Fetch and Parse
-        run: |
-          while read DATE; do
-            echo "Processing $DATE"
-            rm -rf data daily_summary.json
-            mkdir -p data
-            EMAILS='${{ secrets.EMAILS }}' PASSWORDS='${{ secrets.PASSWORDS }}' \
-            ACCOUNT_IDS='${{ secrets.ACCOUNT_IDS }}' PDF_PASSWORDS='${{ secrets.PDF_PASSWORDS }}' \
-            TARGET_DATE=$DATE npm run fetch && TARGET_DATE=$DATE npm run parse
-            mv data "data-$DATE"
-            mv daily_summary.json "daily_summary-$DATE.json"
-          done < dates.txt
+        run: npm run fetch && npm run parse
+        env:
+          EMAILS: ${{ secrets.EMAILS }}
+          PASSWORDS: ${{ secrets.PASSWORDS }}
+          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
 
       - name: Check for PDF files and exit if none
+        id: check_pdfs
         run: |
-          > valid_dates.txt
-          processed_any=false
-          while read DATE; do
-            count=$(find "data-$DATE" -type f -name '*_decrypted.pdf' | wc -l)
-            if [ "$count" -eq 0 ]; then
-              echo "📭 No decrypted PDF files found for $DATE."
-              continue
-            fi
-            echo "$DATE" >> valid_dates.txt
-            processed_any=true
-          done < dates.txt
-          if [ "$processed_any" = false ]; then
-            echo "No decrypted PDFs found for any date. Exiting."
+          count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "📭 No decrypted PDF files found. Stopping workflow successfully."
             exit 0
+          else
+            echo "✅ Decrypted PDF files found: $count"
+            echo "found_pdfs=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Update Google Sheet
-        run: |
-          while read DATE; do
-            mv "data-$DATE" data
-            mv "daily_summary-$DATE.json" daily_summary.json
-            GOOGLE_CREDENTIALS='${{ secrets.GOOGLE_CREDENTIALS }}' \
-            GOOGLE_SHEET_ID='${{ secrets.GOOGLE_SHEET_ID }}' \
-            SHEET_GID='${{ secrets.SHEET_GID }}' SHEET_NAME='${{ secrets.SHEET_NAME }}' \
-            TARGET_DATE=$DATE npm run sheet
-            rm -rf data daily_summary.json
-          done < valid_dates.txt
+        if: steps.check_pdfs.outputs.found_pdfs == 'true'
+        run: npm run sheet
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          SHEET_GID: ${{ secrets.SHEET_GID }}
+          SHEET_NAME: ${{ secrets.SHEET_NAME }}
 
-      - name: Upload updated row tracker artifacts
+      - name: Upload updated row_tracker.json as artifact
+        if: steps.check_pdfs.outputs.found_pdfs == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: row-tracker
-          path: |
-            row_tracker.json
-            row_tracker_updated.json
+          path: row_tracker.json
 
       - name: Delete old artifacts
+        if: steps.check_pdfs.outputs.found_pdfs == 'true'
         uses: c-hive/gha-remove-artifacts@v1
         with:
           age: "2 day"
