@@ -54,50 +54,49 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
-          SHEET_GID: ${{ secrets.SHEET_GID }}
-          EMAILS: ${{ secrets.EMAILS }}
-          PASSWORDS: ${{ secrets.PASSWORDS }}
-          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
-          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
 
-      - name: Run Fetch and Parse
-        run: npm run fetch && npm run parse
-        env:
-          EMAILS: ${{ secrets.EMAILS }}
-          PASSWORDS: ${{ secrets.PASSWORDS }}
-          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
-          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
-
-      - name: Check for PDF files and exit if none
-        id: check_pdfs
+      - name: Process gap dates
         run: |
-          count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
-          if [ "$count" -eq 0 ]; then
-            echo "📭 No decrypted PDF files found. Stopping workflow successfully."
+          if [ ! -f gap_dates.txt ]; then
+            echo "No gap dates found. Exiting."
             exit 0
-          else
-            echo "✅ Decrypted PDF files found: $count"
-            echo "found_pdfs=true" >> $GITHUB_OUTPUT
           fi
-
-      - name: Update Google Sheet
-        if: steps.check_pdfs.outputs.found_pdfs == 'true'
-        run: npm run sheet
+          updated=false
+          while IFS= read -r date; do
+            echo "Processing gap date $date"
+            TARGET_DATE="$date" npm run fetch
+            TARGET_DATE="$date" npm run parse
+            count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
+            if [ "$count" -eq 0 ]; then
+              echo "📭 No decrypted PDF files found for $date. Skipping."
+              rm -rf ./data
+              continue
+            fi
+            echo "✅ Decrypted PDF files found: $count"
+            TARGET_DATE="$date" npm run sheet
+            updated=true
+            rm -rf ./data
+          done < gap_dates.txt
+          echo "updated=$updated" >> $GITHUB_ENV
         env:
+          EMAILS: ${{ secrets.EMAILS }}
+          PASSWORDS: ${{ secrets.PASSWORDS }}
+          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_GID: ${{ secrets.SHEET_GID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
 
       - name: Upload updated row_tracker.json as artifact
-        if: steps.check_pdfs.outputs.found_pdfs == 'true'
+        if: env.updated == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: row-tracker
           path: row_tracker.json
 
       - name: Delete old artifacts
-        if: steps.check_pdfs.outputs.found_pdfs == 'true'
+        if: env.updated == 'true'
         uses: c-hive/gha-remove-artifacts@v1
         with:
           age: "2 day"

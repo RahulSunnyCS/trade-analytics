@@ -2,8 +2,6 @@ const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 const dotenv = require('dotenv');
 const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
 
 dotenv.config();
 
@@ -19,6 +17,7 @@ function formatForSheet(date) {
 
 async function processMissingDates() {
   console.log('Check date started');
+
   const credentials = JSON.parse(
     Buffer.from(process.env.GOOGLE_CREDENTIALS, 'base64').toString('utf8')
   );
@@ -74,38 +73,12 @@ async function processMissingDates() {
     console.log('Missing dates:');
     missingDates.forEach((d) => console.log(formatForSheet(d)));
 
-    for (const date of missingDates) {
-      const iso = date.toISOString().slice(0, 10);
-      console.log(`\nProcessing gap date ${iso}`);
-      const dataDir = path.join(__dirname, 'data');
-      if (fs.existsSync(dataDir)) {
-        fs.rmSync(dataDir, { recursive: true, force: true });
-      }
-
-      execSync('node fetchMail.js', {
-        stdio: 'inherit',
-        env: { ...process.env, TARGET_DATE: iso },
-      });
-
-      const pdfs = fs.existsSync(dataDir)
-        ? fs.readdirSync(dataDir).filter((f) => f.endsWith('_decrypted.pdf'))
-        : [];
-      if (!pdfs.length) {
-        console.log('📭 No decrypted PDFs found for this date. Skipping.');
-        continue;
-      }
-
-      execSync('node parser.js', { stdio: 'inherit', env: process.env });
-      execSync('node updateSheet.js', {
-        stdio: 'inherit',
-        env: { ...process.env, TARGET_DATE: iso },
-      });
-
-      fs.rmSync(dataDir, { recursive: true, force: true });
-    }
+    const isoDates = missingDates.map((d) => d.toISOString().slice(0, 10));
+    fs.writeFileSync('gap_dates.txt', isoDates.join('\n'), 'utf-8');
   } catch (err) {
     console.error('Error checking last date:', err);
   }
 }
 
 processMissingDates();
+
