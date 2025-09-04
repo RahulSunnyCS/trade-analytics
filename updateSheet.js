@@ -24,6 +24,14 @@ async function updateGoogleSheet() {
     const sheetId = process.env.SHEET_GID;
     const sheetName = process.env.SHEET_NAME;
 
+    const targetDate = process.env.TARGET_DATE
+      ? new Date(process.env.TARGET_DATE)
+      : (() => {
+          const d = new Date();
+          d.setDate(d.getDate() - 1);
+          return d;
+        })();
+
     // --- Step 1: Get the last row from row_tracker.json (if it exists)
     let lastRow = 0;
     try {
@@ -97,11 +105,8 @@ async function updateGoogleSheet() {
       data?.total?.final_net +
       data?.total?.net_brokerage;
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const dayName = yesterday.toLocaleDateString("en-GB", { weekday: "long" });
-    const dateFormatted = yesterday.toLocaleDateString("en-GB", {
+    const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
+    const dateFormatted = targetDate.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "2-digit",
@@ -163,10 +168,15 @@ async function updateGoogleSheet() {
 
     console.log("✅ Sheet updated successfully!");
 
-    // --- Step 9: Save new lastUpdatedRow to row_tracker.json
+    // --- Step 9: Save trackers
     fs.writeFileSync(
       "row_tracker.json",
       JSON.stringify({ lastUpdatedRow: newRow }, null, 2),
+      "utf-8"
+    );
+    fs.writeFileSync(
+      "row_tracker_updated.json",
+      JSON.stringify({ lastUpdatedRow: targetDate.toISOString().slice(0, 10) }, null, 2),
       "utf-8"
     );
   } catch (error) {

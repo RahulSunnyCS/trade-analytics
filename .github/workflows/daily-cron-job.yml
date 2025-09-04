@@ -32,9 +32,29 @@ jobs:
             curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -o artifact.zip \
               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
-            
+
             unzip artifact.zip
           fi
+        shell: bash
+
+      - name: Determine dates to process
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          if [ -f row_tracker_updated.json ]; then
+            LAST_DATE=$(jq -r '.lastUpdatedRow' row_tracker_updated.json)
+          fi
+          if [ -z "$LAST_DATE" ] || [ "$LAST_DATE" = "null" ]; then
+            LAST_DATE=$(date -u -d "$TODAY -1 day" +%Y-%m-%d)
+          fi
+          START=$(date -u -d "$LAST_DATE +1 day" +%Y-%m-%d)
+          echo "Generating dates from $START to $TODAY"
+          rm -f dates.txt
+          current="$START"
+          while [ "$(date -u -d \"$current\" +%s)" -le "$(date -u -d \"$TODAY\" +%s)" ]; do
+            echo "$current" >> dates.txt
+            current=$(date -u -d \"$current +1 day\" +%Y-%m-%d)
+          done
+          cat dates.txt
         shell: bash
 
       - name: Set up Node.js
@@ -48,44 +68,43 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run Fetch and Parse
-        run: npm run fetch && npm run parse
+      - name: Process pending dates
+        run: |
+          while IFS= read -r DATE; do
+            echo "Processing $DATE"
+            rm -rf data
+            mkdir data
+            TARGET_DATE=$DATE npm run fetch && TARGET_DATE=$DATE npm run parse
+
+            count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
+            if [ "$count" -eq 0 ]; then
+              echo "No decrypted PDF files for $DATE. Skipping sheet update."
+              mv data "data_$DATE"
+              continue
+            fi
+
+            TARGET_DATE=$DATE npm run sheet
+            mv data "data_$DATE"
+            if [ -f daily_summary.json ]; then mv daily_summary.json "daily_summary_$DATE.json"; fi
+          done < dates.txt
         env:
           EMAILS: ${{ secrets.EMAILS }}
           PASSWORDS: ${{ secrets.PASSWORDS }}
           ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
           PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
-
-      - name: Check for PDF files and exit if none
-        id: check_pdfs
-        run: |
-          count=$(find ./data -type f -name '*_decrypted.pdf' | wc -l)
-          if [ "$count" -eq 0 ]; then
-            echo "📭 No decrypted PDF files found. Stopping workflow successfully."
-            exit 0
-          else
-            echo "✅ Decrypted PDF files found: $count"
-            echo "found_pdfs=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update Google Sheet
-        if: steps.check_pdfs.outputs.found_pdfs == 'true'
-        run: npm run sheet
-        env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_GID: ${{ secrets.SHEET_GID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
 
-      - name: Upload updated row_tracker.json as artifact
-        if: steps.check_pdfs.outputs.found_pdfs == 'true'
+      - name: Upload updated row_tracker_updated.json as artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: row-tracker
-          path: row_tracker.json
+          path: row_tracker_updated.json
 
       - name: Delete old artifacts
-        if: steps.check_pdfs.outputs.found_pdfs == 'true'
         uses: c-hive/gha-remove-artifacts@v1
         with:
           age: "2 day"
