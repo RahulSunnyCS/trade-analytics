@@ -163,10 +163,12 @@ async function updateGoogleSheet() {
 
     console.log("✅ Sheet updated successfully!");
 
-    // --- Step 9: Save new lastUpdatedRow to row_tracker.json
+    // --- Step 9: Save new lastUpdatedRow and date to row_tracker.json
+    const lastProcessedDate = yesterday.toISOString().split("T")[0];
+    const trackerData = { lastUpdatedRow: newRow, lastProcessedDate };
     fs.writeFileSync(
       "row_tracker.json",
-      JSON.stringify({ lastUpdatedRow: newRow }, null, 2),
+      JSON.stringify(trackerData, null, 2),
       "utf-8"
     );
   } catch (error) {

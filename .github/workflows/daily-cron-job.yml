@@ -33,7 +33,7 @@ jobs:
               -o artifact.zip \
               "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip"
             
-            unzip artifact.zip
+            unzip -o artifact.zip
           fi
         shell: bash
 
@@ -47,6 +47,42 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Determine dates to process
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          SHEET_NAME: ${{ secrets.SHEET_NAME }}
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          if [ -f row_tracker.json ]; then
+            LAST_DATE=$(jq -r '.lastProcessedDate' row_tracker.json)
+            if [ "$LAST_DATE" = "null" ] || [ -z "$LAST_DATE" ]; then
+              LAST_DATE=$(node getLastProcessedDate.js)
+            fi
+          else
+            LAST_DATE="$TODAY"
+          fi
+
+          current=$(date -u -d "$LAST_DATE +1 day" +%Y-%m-%d)
+          : > dates.txt
+          while [ "$(date -u -d "$current" +%s)" -le "$(date -u -d "$TODAY" +%s)" ]; do
+            echo "$current" >> dates.txt
+            current=$(date -u -d "$current +1 day" +%Y-%m-%d)
+          done
+
+          if [ -s dates.txt ]; then
+            NEW_LAST_DATE=$(tail -n 1 dates.txt)
+          else
+            NEW_LAST_DATE="$LAST_DATE"
+          fi
+
+          if [ -f row_tracker.json ]; then
+            jq --arg date "$NEW_LAST_DATE" '.lastProcessedDate = $date' row_tracker.json > rt.tmp && mv rt.tmp row_tracker.json
+          else
+            echo "{\"lastProcessedDate\": \"$NEW_LAST_DATE\"}" > row_tracker.json
+          fi
+        shell: bash
 
       - name: Run Fetch and Parse
         run: npm run fetch && npm run parse
