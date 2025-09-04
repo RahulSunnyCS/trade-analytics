@@ -48,6 +48,34 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Determine dates to process
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          if [ -f row_tracker.json ]; then
+            LAST_DATE=$(jq -r '.lastProcessedDate' row_tracker.json)
+            if [ "$LAST_DATE" = "null" ]; then
+              LAST_DATE="$TODAY"
+            fi
+          else
+            LAST_DATE="$TODAY"
+          fi
+
+          current=$(date -u -d "$LAST_DATE +1 day" +%Y-%m-%d)
+          : > dates.txt
+          while [ "$(date -u -d "$current" +%s)" -le "$(date -u -d "$TODAY" +%s)" ]; do
+            echo "$current" >> dates.txt
+            current=$(date -u -d "$current +1 day" +%Y-%m-%d)
+          done
+
+          if [ -s dates.txt ]; then
+            NEW_LAST_DATE=$(tail -n 1 dates.txt)
+          else
+            NEW_LAST_DATE="$LAST_DATE"
+          fi
+
+          echo "{\"lastProcessedDate\": \"$NEW_LAST_DATE\"}" > row_tracker_updated.json
+        shell: bash
+
       - name: Run Fetch and Parse
         run: npm run fetch && npm run parse
         env:
