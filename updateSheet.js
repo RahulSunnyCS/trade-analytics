@@ -97,11 +97,16 @@ async function updateGoogleSheet() {
       data?.total?.final_net +
       data?.total?.net_brokerage;
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    const targetDate = process.env.TARGET_DATE
+      ? new Date(process.env.TARGET_DATE)
+      : (() => {
+          const d = new Date();
+          d.setDate(d.getDate() - 1);
+          return d;
+        })();
 
-    const dayName = yesterday.toLocaleDateString("en-GB", { weekday: "long" });
-    const dateFormatted = yesterday.toLocaleDateString("en-GB", {
+    const dayName = targetDate.toLocaleDateString("en-GB", { weekday: "long" });
+    const dateFormatted = targetDate.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
       year: "2-digit",

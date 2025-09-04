@@ -2,12 +2,23 @@ const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 const dotenv = require('dotenv');
 const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 
 dotenv.config();
 
-async function logMissingDates() {
+function formatForSheet(date) {
+  return date
+    .toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: '2-digit',
+    })
+    .replace(/ /g, '-');
+}
+
+async function processMissingDates() {
   console.log('Check date started');
-  // Decode credentials
   const credentials = JSON.parse(
     Buffer.from(process.env.GOOGLE_CREDENTIALS, 'base64').toString('utf8')
   );
@@ -24,12 +35,10 @@ async function logMissingDates() {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     const sheetName = process.env.SHEET_NAME;
 
-    // Read the last updated row from the artifact
     const trackerRaw = fs.readFileSync('row_tracker.json', 'utf-8');
     const trackerData = JSON.parse(trackerRaw);
     const lastRow = trackerData.lastUpdatedRow;
 
-    // Fetch date from column C at lastRow
     const cell = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: `${sheetName}!C${lastRow}`,
@@ -45,41 +54,58 @@ async function logMissingDates() {
 
     const lastDate = new Date(lastDateStr);
     const today = new Date();
-    const todayStr = today
-      .toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: '2-digit',
-      })
-      .replace(/ /g, '-');
+    today.setHours(0, 0, 0, 0);
 
-    console.log('Today:\t', todayStr);
-
-    // Collect dates between lastDate and today
-    const dates = [];
     const current = new Date(lastDate);
     current.setDate(current.getDate() + 1);
-    while (current <= today) {
-      const formatted = current
-        .toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: '2-digit',
-        })
-        .replace(/ /g, '-');
-      dates.push(formatted);
+    current.setHours(0, 0, 0, 0);
+
+    const missingDates = [];
+    while (current < today) {
+      missingDates.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
 
-    if (dates.length) {
-      console.log('Dates in between:');
-      dates.forEach((d) => console.log(d));
-    } else {
+    if (!missingDates.length) {
       console.log('No missing days.');
+      return;
+    }
+
+    console.log('Missing dates:');
+    missingDates.forEach((d) => console.log(formatForSheet(d)));
+
+    for (const date of missingDates) {
+      const iso = date.toISOString().slice(0, 10);
+      console.log(`\nProcessing gap date ${iso}`);
+      const dataDir = path.join(__dirname, 'data');
+      if (fs.existsSync(dataDir)) {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+      }
+
+      execSync('node fetchMail.js', {
+        stdio: 'inherit',
+        env: { ...process.env, TARGET_DATE: iso },
+      });
+
+      const pdfs = fs.existsSync(dataDir)
+        ? fs.readdirSync(dataDir).filter((f) => f.endsWith('_decrypted.pdf'))
+        : [];
+      if (!pdfs.length) {
+        console.log('📭 No decrypted PDFs found for this date. Skipping.');
+        continue;
+      }
+
+      execSync('node parser.js', { stdio: 'inherit', env: process.env });
+      execSync('node updateSheet.js', {
+        stdio: 'inherit',
+        env: { ...process.env, TARGET_DATE: iso },
+      });
+
+      fs.rmSync(dataDir, { recursive: true, force: true });
     }
   } catch (err) {
     console.error('Error checking last date:', err);
   }
 }
 
-logMissingDates();
+processMissingDates();

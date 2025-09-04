@@ -54,6 +54,11 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
+          SHEET_GID: ${{ secrets.SHEET_GID }}
+          EMAILS: ${{ secrets.EMAILS }}
+          PASSWORDS: ${{ secrets.PASSWORDS }}
+          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
 
       - name: Run Fetch and Parse
         run: npm run fetch && npm run parse
