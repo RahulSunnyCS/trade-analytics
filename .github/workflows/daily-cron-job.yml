@@ -49,12 +49,16 @@ jobs:
         run: npm install
 
       - name: Determine dates to process
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          SHEET_NAME: ${{ secrets.SHEET_NAME }}
         run: |
           TODAY=$(date -u +%Y-%m-%d)
           if [ -f row_tracker.json ]; then
             LAST_DATE=$(jq -r '.lastProcessedDate' row_tracker.json)
-            if [ "$LAST_DATE" = "null" ]; then
-              LAST_DATE="$TODAY"
+            if [ "$LAST_DATE" = "null" ] || [ -z "$LAST_DATE" ]; then
+              LAST_DATE=$(node getLastProcessedDate.js)
             fi
           else
             LAST_DATE="$TODAY"
@@ -73,7 +77,11 @@ jobs:
             NEW_LAST_DATE="$LAST_DATE"
           fi
 
-          echo "{\"lastProcessedDate\": \"$NEW_LAST_DATE\"}" > row_tracker_updated.json
+          if [ -f row_tracker.json ]; then
+            jq --arg date "$NEW_LAST_DATE" '.lastProcessedDate = $date' row_tracker.json > rt.tmp && mv rt.tmp row_tracker.json
+          else
+            echo "{\"lastProcessedDate\": \"$NEW_LAST_DATE\"}" > row_tracker.json
+          fi
         shell: bash
 
       - name: Run Fetch and Parse
