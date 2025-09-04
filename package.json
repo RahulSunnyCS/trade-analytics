@@ -4,10 +4,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "fetch-parse": "npm run fetch && npm run parse && npm run sheet",
+    "fetch-parse": "npm run fetch && npm run check-dates && npm run parse && npm run sheet",
     "fetch": "node fetchMail.js",
     "parse": "node parser.js",
     "sheet": "node updateSheet.js",
+    "check-dates": "node checkDates.js",
     "start": "npm run fetch-parse"
   },
   "keywords": [],

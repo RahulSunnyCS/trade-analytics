@@ -5,9 +5,11 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-// ⏲️ 24-hour window
-const dateSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
-const formattedDate = dateSince.toISOString().slice(0, 10);
+// ⏲️ Target date (defaults to yesterday)
+const targetDate = process.env.TARGET_DATE
+  ? new Date(process.env.TARGET_DATE)
+  : new Date(Date.now() - 24 * 60 * 60 * 1000);
+const formattedDate = targetDate.toISOString().slice(0, 10);
 
 // 📁 Ensure 'data' folder exists
 const dataDir = path.join(__dirname, "data");
@@ -74,9 +76,7 @@ async function processAccount(account) {
       openInbox((err, box) => {
         if (err) return reject(err);
 
-        const formattedDateForSubject = new Date(
-          Date.now() - 24 * 60 * 60 * 1000
-        )
+        const formattedDateForSubject = targetDate
           .toLocaleDateString("en-GB")
           .split("/")
           .join("-");
