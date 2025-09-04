@@ -5,13 +5,8 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-// 🎯 Determine which date to process
-// If TARGET_DATE env var is provided (YYYY-MM-DD), use that.
-// Otherwise default to yesterday.
-const targetDateStr = process.env.TARGET_DATE;
-const dateSince = targetDateStr
-  ? new Date(targetDateStr)
-  : new Date(Date.now() - 24 * 60 * 60 * 1000);
+// ⏲️ 24-hour window
+const dateSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
 const formattedDate = dateSince.toISOString().slice(0, 10);
 
 // 📁 Ensure 'data' folder exists
@@ -79,7 +74,9 @@ async function processAccount(account) {
       openInbox((err, box) => {
         if (err) return reject(err);
 
-        const formattedDateForSubject = dateSince
+        const formattedDateForSubject = new Date(
+          Date.now() - 24 * 60 * 60 * 1000
+        )
           .toLocaleDateString("en-GB")
           .split("/")
           .join("-");
