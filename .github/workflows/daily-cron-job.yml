@@ -50,9 +50,9 @@ jobs:
           echo "Generating dates from $START to $TODAY"
           rm -f dates.txt
           current="$START"
-          while [ "$(date -u -d \"$current\" +%s)" -le "$(date -u -d \"$TODAY\" +%s)" ]; do
+          while [ "$(date -u -d "$current" +%s)" -le "$(date -u -d "$TODAY" +%s)" ]; do
             echo "$current" >> dates.txt
-            current=$(date -u -d \"$current +1 day\" +%Y-%m-%d)
+            current=$(date -u -d "$current +1 day" +%Y-%m-%d)
           done
           cat dates.txt
         shell: bash
