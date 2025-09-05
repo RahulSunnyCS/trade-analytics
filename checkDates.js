@@ -67,13 +67,15 @@ async function processMissingDates() {
 
     if (!missingDates.length) {
       console.log('No missing days.');
-      return;
+    } else {
+      console.log('Missing dates:');
+      missingDates.forEach((d) => console.log(formatForSheet(d)));
     }
 
-    console.log('Missing dates:');
-    missingDates.forEach((d) => console.log(formatForSheet(d)));
-
     const isoDates = missingDates.map((d) => d.toISOString().slice(0, 10));
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    isoDates.push(tomorrow.toISOString().slice(0, 10));
     fs.writeFileSync('gap_dates.txt', isoDates.join('\n'), 'utf-8');
   } catch (err) {
     console.error('Error checking last date:', err);
