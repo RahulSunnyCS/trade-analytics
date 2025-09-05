@@ -92,11 +92,38 @@ async function updateGoogleSheet() {
       console.log(`Date ${dateFormatted} already exists. Skipping update.`);
       return;
     }
+    // --- Step 4: Read daily_summary.json and prepare account values
+    const summaryPath = "daily_summary.json";
+    if (!fs.existsSync(summaryPath)) {
+      console.log("No daily summary found. Skipping update.");
+      return;
+    }
+    const rawData = fs.readFileSync(summaryPath, "utf-8");
+    const data = JSON.parse(rawData);
+    if (!data.individual_account || data.individual_account.length === 0) {
+      console.log("No account data found. Skipping update.");
+      return;
+    }
 
-    // --- Step 4: Set newRow as the previous row value + 1
+    const accountIds = process.env.ACCOUNT_IDS
+      ? process.env.ACCOUNT_IDS.split(",")
+      : [];
+
     const newRow = lastRow ? parseInt(lastRow) + 1 : 1;
     const newRowValue = lastRowValue ? parseInt(lastRowValue) + 1 : 1;
+    const rowValues = [newRowValue, dayName, dateFormatted];
 
+    accountIds.forEach((id) => {
+      const acct = data.individual_account.find(
+        (a) => a.account === id || a.account.includes(id)
+      );
+      rowValues.push(acct?.payin_payout_obligation || 0);
+      rowValues.push(acct?.net_brokerage || 0);
+    });
+
+    const dataColumnCount = rowValues.length;
+
+    // Insert a new row before writing values
     const insertRequest = {
       spreadsheetId,
       resource: {
@@ -118,21 +145,6 @@ async function updateGoogleSheet() {
 
     await sheets.spreadsheets.batchUpdate(insertRequest);
 
-    // --- Step 5: Read your daily_summary.json
-    const rawData = fs.readFileSync("daily_summary.json", "utf-8");
-    const data = JSON.parse(rawData);
-
-    // --- Step 6: Prepare dynamic values for new row
-    const accountValues = data?.individual_account || [];
-    const rowValues = [newRowValue, dayName, dateFormatted];
-
-    accountValues.forEach((acct) => {
-      rowValues.push(acct.payin_payout_obligation);
-      rowValues.push(acct.net_brokerage);
-    });
-
-    const dataColumnCount = rowValues.length;
-
     // Insert values covering only the data columns
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -141,7 +153,7 @@ async function updateGoogleSheet() {
       resource: { values: [rowValues] },
     });
 
-    // --- Step 7: Copy formulas from the previous row (if any)
+    // --- Step 6: Copy formulas from the previous row (if any)
     const formulaColsCount = Math.max(lastRowData.length - dataColumnCount, 0);
 
     if (formulaColsCount > 0) {
@@ -177,7 +189,7 @@ async function updateGoogleSheet() {
 
     console.log("✅ Sheet updated successfully!");
 
-    // --- Step 8: Save new lastUpdatedRow to row_tracker.json
+    // --- Step 7: Save new lastUpdatedRow to row_tracker.json
     fs.writeFileSync(
       "row_tracker.json",
       JSON.stringify({ lastUpdatedRow: newRow }, null, 2),
