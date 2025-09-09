@@ -5,6 +5,16 @@ const fs = require("fs");
 
 dotenv.config();
 
+function columnToLetter(column) {
+  let letter = "";
+  while (column > 0) {
+    const temp = (column - 1) % 26;
+    letter = String.fromCharCode(65 + temp) + letter;
+    column = Math.floor((column - temp - 1) / 26);
+  }
+  return letter;
+}
+
 async function updateGoogleSheet() {
   // Decode credentials
   const credentials = JSON.parse(
@@ -70,7 +80,7 @@ async function updateGoogleSheet() {
         ? (
             await sheets.spreadsheets.values.get({
               spreadsheetId,
-              range: `${sheetName}!A${lastRow}:C${lastRow}`,
+              range: `${sheetName}!A${lastRow}:ZZ${lastRow}`,
             })
           ).data.values[0]
         : [];
@@ -82,11 +92,38 @@ async function updateGoogleSheet() {
       console.log(`Date ${dateFormatted} already exists. Skipping update.`);
       return;
     }
+    // --- Step 4: Read daily_summary.json and prepare account values
+    const summaryPath = "daily_summary.json";
+    if (!fs.existsSync(summaryPath)) {
+      console.log("No daily summary found. Skipping update.");
+      return;
+    }
+    const rawData = fs.readFileSync(summaryPath, "utf-8");
+    const data = JSON.parse(rawData);
+    if (!data.individual_account || data.individual_account.length === 0) {
+      console.log("No account data found. Skipping update.");
+      return;
+    }
 
-    // --- Step 4: Set newRow as the previous row value + 1
+    const accountIds = process.env.ACCOUNT_IDS
+      ? process.env.ACCOUNT_IDS.split(",")
+      : [];
+
     const newRow = lastRow ? parseInt(lastRow) + 1 : 1;
     const newRowValue = lastRowValue ? parseInt(lastRowValue) + 1 : 1;
+    const rowValues = [newRowValue, dayName, dateFormatted];
 
+    accountIds.forEach((id) => {
+      const acct = data.individual_account.find(
+        (a) => a.account === id || a.account.includes(id)
+      );
+      rowValues.push(acct?.payin_payout_obligation || 0);
+      rowValues.push(acct?.net_brokerage || 0);
+    });
+
+    const dataColumnCount = rowValues.length;
+
+    // Insert a new row before writing values
     const insertRequest = {
       spreadsheetId,
       resource: {
@@ -108,75 +145,51 @@ async function updateGoogleSheet() {
 
     await sheets.spreadsheets.batchUpdate(insertRequest);
 
-    // --- Step 5: Read your daily_summary.json
-    const rawData = fs.readFileSync("daily_summary.json", "utf-8");
-    const data = JSON.parse(rawData);
-
-    // --- Step 6: Prepare values for new row
-    const sellAlgo =
-      data?.total?.payin_payout_obligation + data?.total?.net_brokerage;
-    const brokerage =
-      data?.total?.payin_payout_obligation -
-      data?.total?.final_net +
-      data?.total?.net_brokerage;
-
-    const values = [
-      [
-        newRowValue,
-        dayName,
-        dateFormatted,
-        sellAlgo,
-        brokerage,
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-      ],
-    ];
-
-    // --- Step 7: Insert values in A to K columns (with new row)
+    // Insert values covering only the data columns
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A${newRow}:K${newRow}`,
+      range: `${sheetName}!A${newRow}:${columnToLetter(dataColumnCount)}${newRow}`,
       valueInputOption: "RAW",
-      resource: { values },
+      resource: { values: [rowValues] },
     });
 
-    // --- Step 8: Copy formulas from the previous row (F to K)
-    const copyRequest = {
-      spreadsheetId,
-      resource: {
-        requests: [
-          {
-            copyPaste: {
-              source: {
-                sheetId,
-                startRowIndex: lastRow - 1, // Last row (zero-based index)
-                endRowIndex: lastRow,
-                startColumnIndex: 5, // Column F (zero-based index)
-                endColumnIndex: 11, // Column K
-              },
-              destination: {
-                sheetId,
-                startRowIndex: newRow - 1, // New row (zero-based index)
-                endRowIndex: newRow,
-                startColumnIndex: 5, // Column F
-                endColumnIndex: 11, // Column K
-              },
-              pasteType: "PASTE_FORMULA",
-            },
-          },
-        ],
-      },
-    };
+    // --- Step 6: Copy formulas from the previous row (if any)
+    const formulaColsCount = Math.max(lastRowData.length - dataColumnCount, 0);
 
-    await sheets.spreadsheets.batchUpdate(copyRequest);
+    if (formulaColsCount > 0) {
+      const copyRequest = {
+        spreadsheetId,
+        resource: {
+          requests: [
+            {
+              copyPaste: {
+                source: {
+                  sheetId,
+                  startRowIndex: lastRow - 1,
+                  endRowIndex: lastRow,
+                  startColumnIndex: dataColumnCount,
+                  endColumnIndex: dataColumnCount + formulaColsCount,
+                },
+                destination: {
+                  sheetId,
+                  startRowIndex: newRow - 1,
+                  endRowIndex: newRow,
+                  startColumnIndex: dataColumnCount,
+                  endColumnIndex: dataColumnCount + formulaColsCount,
+                },
+                pasteType: "PASTE_FORMULA",
+              },
+            },
+          ],
+        },
+      };
+
+      await sheets.spreadsheets.batchUpdate(copyRequest);
+    }
 
     console.log("✅ Sheet updated successfully!");
 
-    // --- Step 9: Save new lastUpdatedRow to row_tracker.json
+    // --- Step 7: Save new lastUpdatedRow to row_tracker.json
     fs.writeFileSync(
       "row_tracker.json",
       JSON.stringify({ lastUpdatedRow: newRow }, null, 2),
