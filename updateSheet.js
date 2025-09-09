@@ -118,7 +118,7 @@ async function updateGoogleSheet() {
         (a) => a.account === id || a.account.includes(id)
       );
       rowValues.push(acct?.payin_payout_obligation || 0);
-      rowValues.push(acct?.net_brokerage || 0);
+      rowValues.push(acct?.payin_payout_obligation - acct?.final_net || 0);
     });
 
     const dataColumnCount = rowValues.length;
