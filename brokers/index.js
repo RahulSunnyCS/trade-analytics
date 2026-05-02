@@ -38,7 +38,12 @@ function loadBrokerAccounts() {
     for (const acc of mb.accounts) {
       if (!acc.broker || !acc.accountId || !acc.pdfPassword) {
         throw new Error(
-          `Each account needs { broker, accountId, pdfPassword }; got ${JSON.stringify(acc)}`
+          `Each account needs { broker, accountId, pdfPassword, sheetStartColumn }; got ${JSON.stringify(acc)}`
+        );
+      }
+      if (!acc.sheetStartColumn || !/^[A-Z]+$/.test(acc.sheetStartColumn)) {
+        throw new Error(
+          `Account ${acc.accountId} needs sheetStartColumn as an A-Z letter (e.g. "D"); got ${JSON.stringify(acc.sheetStartColumn)}`
         );
       }
       getBroker(acc.broker);
@@ -55,6 +60,7 @@ function flattenAccounts(config) {
         email: mb.email,
         broker: acc.broker,
         accountId: acc.accountId,
+        sheetStartColumn: acc.sheetStartColumn,
       });
     }
   }

@@ -46,7 +46,7 @@ Gmail (IMAP) → fetchMail.js → data/*.pdf (encrypted)
 
 **`checkDates.js`** — Reads `row_tracker.json` for the last-updated sheet row, fetches the date in column C of that row from the Google Sheet, and writes `gap_dates.txt` listing all missing trading dates plus tomorrow. The CI workflow loops over this file to backfill gaps. Broker-agnostic.
 
-**`updateSheet.js`** — Reads `daily_summary.json`, resolves the next empty row via `row_tracker.json` (falling back to the sheet itself), and inserts a new row with serial number / day name / date / per-account P&L values. Account → column order is determined by flattening `BROKER_ACCOUNTS_JSON` in declaration order. Formula columns from the previous row are copied forward.
+**`updateSheet.js`** — Reads `daily_summary.json`, resolves the next empty row via `row_tracker.json` (falling back to the sheet itself), inserts a new row, copies all formulas from the previous row via `PASTE_FORMULA`, then overwrites columns A–C (serial / day / date) and a 5-column block per account at the `sheetStartColumn` declared in `BROKER_ACCOUNTS_JSON`. The 5 columns are: `payin_payout_obligation`, `net_brokerage`, `other_charges`, `total_charges` (= brokerage + other_charges), `final_net`.
 
 **`row_tracker.json`** — Persisted between CI runs as a GitHub Actions artifact named `row-tracker`. It stores `{ "lastUpdatedRow": N }` to avoid a live sheet read on every run.
 
@@ -60,21 +60,31 @@ A single env var holds a JSON array of mailboxes. Each mailbox has one Gmail log
     "email": "user1@gmail.com",
     "emailPassword": "gmail-app-password-1",
     "accounts": [
-      { "broker": "finvasia", "accountId": "FA1234", "pdfPassword": "pdf-pwd-1" },
-      { "broker": "angelone",  "accountId": "R59799620", "pdfPassword": "pdf-pwd-2" }
+      { "broker": "finvasia", "accountId": "FA1234", "pdfPassword": "pdf-pwd-1", "sheetStartColumn": "D" },
+      { "broker": "angelone",  "accountId": "R59799620", "pdfPassword": "pdf-pwd-2", "sheetStartColumn": "I" }
     ]
   },
   {
     "email": "user2@gmail.com",
     "emailPassword": "gmail-app-password-2",
     "accounts": [
-      { "broker": "finvasia", "accountId": "FA9999", "pdfPassword": "pdf-pwd-3" }
+      { "broker": "finvasia", "accountId": "FA9999", "pdfPassword": "pdf-pwd-3", "sheetStartColumn": "N" }
     ]
   }
 ]
 ```
 
-The flattened account order (mailbox-by-mailbox, account-by-account) defines the Google Sheet column order — keep it stable across runs.
+`sheetStartColumn` is the leftmost Google Sheet column for that account's daily values. Each account writes a contiguous 5-column block at that position:
+
+| Offset | Column (e.g. start = `D`) | Value |
+|---|---|---|
+| 0 | `D` | `payin_payout_obligation` |
+| 1 | `E` | `net_brokerage` |
+| 2 | `F` | `other_charges` |
+| 3 | `G` | `total_charges` (= `net_brokerage + other_charges`, computed by `updateSheet.js`) |
+| 4 | `H` | `final_net` |
+
+Columns A–C are reserved for serial number / day name / formatted date. Pick `sheetStartColumn` for each account so the per-account 5-column blocks don't overlap; gaps between blocks (and any cells with formulas) are preserved from the previous row via `PASTE_FORMULA`.
 
 ### Adding a New Broker
 

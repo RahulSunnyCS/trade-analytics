@@ -20,7 +20,7 @@ This project consists of three main scripts:
 Before running the scripts, you need to set up a `.env` file with the following variables:
 
 ```env
-BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"app-pwd-1","accounts":[{"broker":"finvasia","accountId":"FA1234","pdfPassword":"pdf-pwd-1"},{"broker":"angelone","accountId":"R59799620","pdfPassword":"pdf-pwd-2"}]}]
+BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"app-pwd-1","accounts":[{"broker":"finvasia","accountId":"FA1234","pdfPassword":"pdf-pwd-1","sheetStartColumn":"D"},{"broker":"angelone","accountId":"R59799620","pdfPassword":"pdf-pwd-2","sheetStartColumn":"I"}]}]
 GOOGLE_CREDENTIALS=Base64_Encoded_Google_Credentials_JSON
 GOOGLE_SHEET_ID=your_google_sheet_id
 SHEET_GID=your_sheet_gid
@@ -35,21 +35,33 @@ SHEET_NAME=your_sheet_name
     "email": "user1@gmail.com",
     "emailPassword": "gmail-app-password-1",
     "accounts": [
-      { "broker": "finvasia", "accountId": "FA1234", "pdfPassword": "pdf-pwd-1" },
-      { "broker": "angelone",  "accountId": "R59799620", "pdfPassword": "pdf-pwd-2" }
+      { "broker": "finvasia", "accountId": "FA1234", "pdfPassword": "pdf-pwd-1", "sheetStartColumn": "D" },
+      { "broker": "angelone",  "accountId": "R59799620", "pdfPassword": "pdf-pwd-2", "sheetStartColumn": "I" }
     ]
   },
   {
     "email": "user2@gmail.com",
     "emailPassword": "gmail-app-password-2",
     "accounts": [
-      { "broker": "finvasia", "accountId": "FA9999", "pdfPassword": "pdf-pwd-3" }
+      { "broker": "finvasia", "accountId": "FA9999", "pdfPassword": "pdf-pwd-3", "sheetStartColumn": "N" }
     ]
   }
 ]
 ```
 
-Supported `broker` values: `finvasia`, `angelone`. The flattened account order (mailbox-by-mailbox, then account-by-account) determines the Google Sheet column order — keep it stable across runs.
+Supported `broker` values: `finvasia`, `angelone`.
+
+`sheetStartColumn` is the leftmost Google Sheet column for that account's daily values. Each account writes a contiguous 5-column block starting there:
+
+| Offset | Column (e.g. start = `D`) | Value                                                |
+| ------ | ------------------------- | ---------------------------------------------------- |
+| 0      | `D`                       | `payin_payout_obligation`                            |
+| 1      | `E`                       | `net_brokerage`                                      |
+| 2      | `F`                       | `other_charges`                                      |
+| 3      | `G`                       | `total_charges` (= `net_brokerage + other_charges`)  |
+| 4      | `H`                       | `final_net`                                          |
+
+Columns A–C are reserved for the serial number, day name and formatted date. Pick `sheetStartColumn` per account so the 5-column blocks don't overlap; any other columns (gaps between blocks, or formulas further right) are preserved from the previous row.
 
 ### Explanation:
 
@@ -85,7 +97,7 @@ Supported `broker` values: `finvasia`, `angelone`. The flattened account order (
 ## Example `.env` (Generic)
 
 ```env
-BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"yourpassword1","accounts":[{"broker":"finvasia","accountId":"accountid1","pdfPassword":"pdfpwd1"}]},{"email":"user2@gmail.com","emailPassword":"yourpassword2","accounts":[{"broker":"angelone","accountId":"accountid2","pdfPassword":"pdfpwd2"}]}]
+BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"yourpassword1","accounts":[{"broker":"finvasia","accountId":"accountid1","pdfPassword":"pdfpwd1","sheetStartColumn":"D"}]},{"email":"user2@gmail.com","emailPassword":"yourpassword2","accounts":[{"broker":"angelone","accountId":"accountid2","pdfPassword":"pdfpwd2","sheetStartColumn":"I"}]}]
 GOOGLE_CREDENTIALS=your_base64_encoded_service_account_json
 GOOGLE_SHEET_ID=your_google_sheet_id_here
 SHEET_GID=your_sheet_gid_here
