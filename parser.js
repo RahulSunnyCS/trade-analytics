@@ -3,6 +3,13 @@ const path = require("path");
 const pdfParse = require("pdf-parse");
 const { getBroker, parseFileName } = require("./brokers");
 
+const SUMMARY_FIELDS = [
+  "payin_payout_obligation",
+  "final_net",
+  "net_brokerage",
+  "other_charges",
+];
+
 const dataDir = path.join(__dirname, "data");
 const pdfFiles = fs
   .readdirSync(dataDir)
@@ -15,11 +22,7 @@ if (!pdfFiles.length) {
 
 const mergedSummary = {
   individual_account: [],
-  total: {
-    payin_payout_obligation: 0,
-    final_net: 0,
-    net_brokerage: 0,
-  },
+  total: Object.fromEntries(SUMMARY_FIELDS.map((f) => [f, 0])),
 };
 
 (async () => {
@@ -49,19 +52,17 @@ const mergedSummary = {
       }
       console.log(`🎯 ${meta.broker} summary for ${meta.accountId}:`, summary);
 
-      mergedSummary.individual_account.push({
+      const accountEntry = {
         account: meta.accountId,
         broker: meta.broker,
         email: meta.email,
-        payin_payout_obligation: summary.payin_payout_obligation,
-        final_net: summary.final_net,
-        net_brokerage: summary.net_brokerage,
-      });
-
-      mergedSummary.total.payin_payout_obligation +=
-        summary.payin_payout_obligation;
-      mergedSummary.total.final_net += summary.final_net;
-      mergedSummary.total.net_brokerage += summary.net_brokerage;
+      };
+      for (const f of SUMMARY_FIELDS) {
+        const v = summary[f] ?? 0;
+        accountEntry[f] = v;
+        mergedSummary.total[f] += v;
+      }
+      mergedSummary.individual_account.push(accountEntry);
     } catch (err) {
       console.error(`❌ Error parsing ${file}:`, err.message);
     }

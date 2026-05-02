@@ -13,10 +13,15 @@ function extract(text) {
   const brokerageMatch = text.match(/Total Brokerage\s*=\s*(\d+\.\d{2})/);
   if (!brokerageMatch) return { error: "Angel One Total Brokerage not matched" };
 
+  const rawObligation = nums[0];
+  const finalNet = nums[10];
+  const brokerage = parseFloat(brokerageMatch[1]);
+
   return {
-    payin_payout_obligation: nums[0],
-    final_net: nums[10],
-    net_brokerage: parseFloat(brokerageMatch[1]),
+    payin_payout_obligation: rawObligation - brokerage,
+    final_net: finalNet,
+    net_brokerage: brokerage,
+    other_charges: finalNet - rawObligation,
   };
 }
 
