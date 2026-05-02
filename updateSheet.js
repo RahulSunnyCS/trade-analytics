@@ -2,6 +2,7 @@ const { google } = require("googleapis");
 const { JWT } = require("google-auth-library");
 const dotenv = require("dotenv");
 const fs = require("fs");
+const { loadBrokerAccounts, flattenAccounts } = require("./brokers");
 
 dotenv.config();
 
@@ -105,20 +106,20 @@ async function updateGoogleSheet() {
       return;
     }
 
-    const accountIds = process.env.ACCOUNT_IDS
-      ? process.env.ACCOUNT_IDS.split(",")
-      : [];
+    const flatAccounts = flattenAccounts(loadBrokerAccounts());
 
     const newRow = lastRow ? parseInt(lastRow) + 1 : 1;
     const newRowValue = lastRowValue ? parseInt(lastRowValue) + 1 : 1;
     const rowValues = [newRowValue, dayName, dateFormatted];
 
-    accountIds.forEach((id) => {
-      const acct = data.individual_account.find(
-        (a) => a.account === id || a.account.includes(id)
+    flatAccounts.forEach((acc) => {
+      const match = data.individual_account.find(
+        (a) => a.account === acc.accountId
       );
-      rowValues.push(acct?.payin_payout_obligation || 0);
-      rowValues.push(acct?.payin_payout_obligation - acct?.final_net || 0);
+      rowValues.push(match?.payin_payout_obligation || 0);
+      rowValues.push(
+        (match?.payin_payout_obligation - match?.final_net) || 0
+      );
     });
 
     const dataColumnCount = rowValues.length;

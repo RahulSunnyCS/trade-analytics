@@ -20,26 +20,46 @@ This project consists of three main scripts:
 Before running the scripts, you need to set up a `.env` file with the following variables:
 
 ```env
-EMAILS=email1@gmail.com,email2@gmail.com
-PASSWORDS=password1,password2
-ACCOUNT_IDS=accountid1,accountid2
+BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"app-pwd-1","accounts":[{"broker":"finvasia","accountId":"FA1234","pdfPassword":"pdf-pwd-1"},{"broker":"angelone","accountId":"R59799620","pdfPassword":"pdf-pwd-2"}]}]
 GOOGLE_CREDENTIALS=Base64_Encoded_Google_Credentials_JSON
 GOOGLE_SHEET_ID=your_google_sheet_id
 SHEET_GID=your_sheet_gid
 SHEET_NAME=your_sheet_name
 ```
 
+`BROKER_ACCOUNTS_JSON` models the real 1-to-N relationship between a Gmail inbox and the broker accounts whose contract notes land in it. Pretty-printed:
+
+```json
+[
+  {
+    "email": "user1@gmail.com",
+    "emailPassword": "gmail-app-password-1",
+    "accounts": [
+      { "broker": "finvasia", "accountId": "FA1234", "pdfPassword": "pdf-pwd-1" },
+      { "broker": "angelone",  "accountId": "R59799620", "pdfPassword": "pdf-pwd-2" }
+    ]
+  },
+  {
+    "email": "user2@gmail.com",
+    "emailPassword": "gmail-app-password-2",
+    "accounts": [
+      { "broker": "finvasia", "accountId": "FA9999", "pdfPassword": "pdf-pwd-3" }
+    ]
+  }
+]
+```
+
+Supported `broker` values: `finvasia`, `angelone`. The flattened account order (mailbox-by-mailbox, then account-by-account) determines the Google Sheet column order — keep it stable across runs.
+
 ### Explanation:
 
-| Variable             | Description                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `EMAILS`             | Comma-separated list of Gmail addresses to fetch mails from.                                |
-| `PASSWORDS`          | Corresponding comma-separated passwords for the above emails (use app passwords if needed). |
-| `ACCOUNT_IDS`        | Comma-separated account IDs to match with extracted trades.                                 |
-| `GOOGLE_CREDENTIALS` | Base64 encoded service account JSON credentials for Google Sheets API access.               |
-| `GOOGLE_SHEET_ID`    | ID of the target Google Sheet where data should be updated.                                 |
-| `SHEET_GID`          | GID of the specific sheet/tab inside the Google Sheet.                                      |
-| `SHEET_NAME`         | Name of the specific sheet/tab inside the Google Sheet.                                     |
+| Variable               | Description                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BROKER_ACCOUNTS_JSON` | JSON array of mailboxes, each with `email`, `emailPassword`, and `accounts[]` (each account has `broker`, `accountId`, `pdfPassword`).     |
+| `GOOGLE_CREDENTIALS`   | Base64 encoded service account JSON credentials for Google Sheets API access.                                                              |
+| `GOOGLE_SHEET_ID`      | ID of the target Google Sheet where data should be updated.                                                                                |
+| `SHEET_GID`            | GID of the specific sheet/tab inside the Google Sheet.                                                                                     |
+| `SHEET_NAME`           | Name of the specific sheet/tab inside the Google Sheet.                                                                                    |
 
 ---
 
@@ -65,9 +85,7 @@ SHEET_NAME=your_sheet_name
 ## Example `.env` (Generic)
 
 ```env
-EMAILS=user1@gmail.com,user2@gmail.com
-PASSWORDS=yourpassword1,yourpassword2
-ACCOUNT_IDS=accountid1,accountid2
+BROKER_ACCOUNTS_JSON=[{"email":"user1@gmail.com","emailPassword":"yourpassword1","accounts":[{"broker":"finvasia","accountId":"accountid1","pdfPassword":"pdfpwd1"}]},{"email":"user2@gmail.com","emailPassword":"yourpassword2","accounts":[{"broker":"angelone","accountId":"accountid2","pdfPassword":"pdfpwd2"}]}]
 GOOGLE_CREDENTIALS=your_base64_encoded_service_account_json
 GOOGLE_SHEET_ID=your_google_sheet_id_here
 SHEET_GID=your_sheet_gid_here
@@ -87,15 +105,13 @@ To use this project with **GitHub Actions**, make sure you add the environment v
 3. Click **"New repository secret"**.
 4. Add each of the following as separate secrets:
 
-| GitHub Secret Name   | Corresponds to .env Variable |
-| -------------------- | ---------------------------- |
-| `EMAILS`             | `EMAILS`                     |
-| `PASSWORDS`          | `PASSWORDS`                  |
-| `ACCOUNT_IDS`        | `ACCOUNT_IDS`                |
-| `GOOGLE_CREDENTIALS` | `GOOGLE_CREDENTIALS`         |
-| `GOOGLE_SHEET_ID`    | `GOOGLE_SHEET_ID`            |
-| `SHEET_GID`          | `SHEET_GID`                  |
-| `SHEET_NAME`         | `SHEET_NAME`                 |
+| GitHub Secret Name     | Corresponds to .env Variable |
+| ---------------------- | ---------------------------- |
+| `BROKER_ACCOUNTS_JSON` | `BROKER_ACCOUNTS_JSON`       |
+| `GOOGLE_CREDENTIALS`   | `GOOGLE_CREDENTIALS`         |
+| `GOOGLE_SHEET_ID`      | `GOOGLE_SHEET_ID`            |
+| `SHEET_GID`            | `SHEET_GID`                  |
+| `SHEET_NAME`           | `SHEET_NAME`                 |
 
 ### Notes:
 
@@ -104,9 +120,7 @@ To use this project with **GitHub Actions**, make sure you add the environment v
 
 ```yaml
 env:
-  EMAILS: ${{ secrets.EMAILS }}
-  PASSWORDS: ${{ secrets.PASSWORDS }}
-  ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
+  BROKER_ACCOUNTS_JSON: ${{ secrets.BROKER_ACCOUNTS_JSON }}
   GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
   GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
   SHEET_GID: ${{ secrets.SHEET_GID }}

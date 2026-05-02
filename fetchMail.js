@@ -5,49 +5,28 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-// ⏲️ Target date (defaults to yesterday)
+const {
+  loadBrokerAccounts,
+  getBroker,
+  makeFileName,
+} = require("./brokers");
+
 const targetDate = process.env.TARGET_DATE
   ? new Date(process.env.TARGET_DATE)
   : new Date(Date.now() - 24 * 60 * 60 * 1000);
 const formattedDate = targetDate.toISOString().slice(0, 10);
 
-// 📁 Ensure 'data' folder exists
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
-// 📦 Parse from .env
-const emails = process.env.EMAILS.split(",");
-const passwords = process.env.PASSWORDS.split(",");
-const accountIds = process.env.ACCOUNT_IDS.split(",");
-const pdfPasswords = process.env.PDF_PASSWORDS.split(",");
-
-// 🧪 Sanity check
-if (
-  emails.length !== passwords.length ||
-  emails.length !== accountIds.length ||
-  emails.length !== pdfPasswords.length
-) {
-  throw new Error(
-    "EMAILS, PASSWORDS, ACCOUNT_IDS, and PDF_PASSWORDS must be of the same length in .env"
-  );
-}
-
-const accounts = emails.map((email, i) => ({
-  email,
-  password: passwords[i],
-  accountId: accountIds[i],
-  pdfPassword: pdfPasswords[i],
-}));
+const mailboxes = loadBrokerAccounts();
 
 async function decryptWithQpdf(filePath, password) {
   const decryptedPath = filePath.replace(/\.pdf$/i, "_decrypted.pdf");
-
   try {
     execSync(
       `qpdf --password='${password}' --decrypt "${filePath}" "${decryptedPath}"`,
-      {
-        stdio: "ignore",
-      }
+      { stdio: "ignore" }
     );
     console.log("🔓 PDF decrypted using qpdf:", decryptedPath);
     return decryptedPath;
@@ -57,90 +36,112 @@ async function decryptWithQpdf(filePath, password) {
   }
 }
 
-async function processAccount(account) {
+function fetchAttachmentsForSubject(imap, subjectSearch) {
+  return new Promise((resolve, reject) => {
+    imap.search(
+      [["SINCE", formattedDate], ["SUBJECT", subjectSearch]],
+      (err, results) => {
+        if (err) return reject(err);
+        if (!results || !results.length) return resolve([]);
+
+        const attachments = [];
+        const parsePromises = [];
+        const f = imap.fetch(results, { bodies: "", struct: true });
+
+        f.on("message", (msg) => {
+          msg.on("body", (stream) => {
+            parsePromises.push(
+              simpleParser(stream).then((parsed) => {
+                for (const att of parsed.attachments || []) {
+                  if (
+                    att.filename &&
+                    att.filename.toLowerCase().endsWith(".pdf")
+                  ) {
+                    attachments.push(att);
+                  }
+                }
+              })
+            );
+          });
+        });
+
+        f.once("error", reject);
+        f.once("end", async () => {
+          try {
+            await Promise.all(parsePromises);
+            resolve(attachments);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }
+    );
+  });
+}
+
+async function processMailbox(mailbox) {
   return new Promise((resolve, reject) => {
     const imap = new Imap({
-      user: account.email,
-      password: account.password,
+      user: mailbox.email,
+      password: mailbox.emailPassword,
       host: "imap.gmail.com",
       port: 993,
       tls: true,
       tlsOptions: { rejectUnauthorized: false },
     });
 
-    function openInbox(cb) {
-      imap.openBox("INBOX", false, cb);
-    }
-
     imap.once("ready", () => {
-      openInbox((err, box) => {
-        if (err) return reject(err);
+      imap.openBox("INBOX", false, async (err) => {
+        if (err) {
+          imap.end();
+          return reject(err);
+        }
 
-        const formattedDateForSubject = targetDate
-          .toLocaleDateString("en-GB")
-          .split("/")
-          .join("-");
+        try {
+          for (const acc of mailbox.accounts) {
+            const broker = getBroker(acc.broker);
+            const subjectSearch = broker.subject(acc.accountId, targetDate);
+            console.log(
+              `🔎 ${mailbox.email} → ${acc.broker}/${acc.accountId}: "${subjectSearch}"`
+            );
 
-        const subjectSearch = `Combined Contract Note for ${account.accountId} ${formattedDateForSubject}`;
-
-        imap.search(
-          [
-            ["SINCE", formattedDate],
-            ["SUBJECT", subjectSearch],
-          ],
-          (err, results) => {
-            if (err) return reject(err);
-            if (!results.length) {
+            const attachments = await fetchAttachmentsForSubject(
+              imap,
+              subjectSearch
+            );
+            if (!attachments.length) {
               console.log(
-                `📭 No emails found for ${account.email} with account ID ${account.accountId}`
+                `📭 No mail for ${acc.broker}/${acc.accountId} in ${mailbox.email}`
               );
-              imap.end();
-              return resolve();
+              continue;
             }
 
-            const f = imap.fetch(results, { bodies: "", struct: true });
-
-            f.on("message", (msg) => {
-              msg.on("body", (stream) => {
-                simpleParser(stream, async (err, parsed) => {
-                  const attachments = parsed.attachments || [];
-                  for (const attachment of attachments) {
-                    if (attachment.filename.toLowerCase().endsWith(".pdf")) {
-                      const filename = `${account.email.replace(
-                        /[@.]/g,
-                        "_"
-                      )}_${attachment.filename}`;
-                      const filePath = path.join(dataDir, filename);
-                      fs.writeFileSync(filePath, attachment.content);
-                      console.log(`📎 Saved attachment: ${filename}`);
-
-                      const decryptedPath = await decryptWithQpdf(
-                        filePath,
-                        account.pdfPassword
-                      );
-                      if (!decryptedPath) {
-                        console.warn(
-                          `⚠️ Could not decrypt PDF for ${account.email}`
-                        );
-                      }
-                    }
-                  }
-                });
-              });
-            });
-
-            f.once("end", () => {
-              console.log(`✅ Finished processing ${account.email}`);
-              imap.end();
-              resolve();
-            });
+            for (const att of attachments) {
+              const filename = makeFileName(
+                mailbox.email,
+                acc.broker,
+                acc.accountId,
+                att.filename
+              );
+              const filePath = path.join(dataDir, filename);
+              fs.writeFileSync(filePath, att.content);
+              console.log(`📎 Saved attachment: ${filename}`);
+              await decryptWithQpdf(filePath, acc.pdfPassword);
+            }
           }
-        );
+
+          console.log(`✅ Finished processing ${mailbox.email}`);
+          imap.end();
+          resolve();
+        } catch (err) {
+          imap.end();
+          reject(err);
+        }
       });
     });
 
     imap.once("error", (err) => {
-      console.error(`❌ IMAP error for ${account.email}: ${err.message}`);
+      console.error(`❌ IMAP error for ${mailbox.email}: ${err.message}`);
       reject(err);
     });
 
@@ -149,11 +150,11 @@ async function processAccount(account) {
 }
 
 (async () => {
-  for (const acc of accounts) {
+  for (const mb of mailboxes) {
     try {
-      await processAccount(acc);
+      await processMailbox(mb);
     } catch (err) {
-      console.error(`⚠️ Failed for ${acc.email}: ${err.message}`);
+      console.error(`⚠️ Failed for ${mb.email}: ${err.message}`);
     }
   }
 })();

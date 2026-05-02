@@ -79,10 +79,7 @@ jobs:
           done < gap_dates.txt
           echo "updated=$updated" >> $GITHUB_ENV
         env:
-          EMAILS: ${{ secrets.EMAILS }}
-          PASSWORDS: ${{ secrets.PASSWORDS }}
-          ACCOUNT_IDS: ${{ secrets.ACCOUNT_IDS }}
-          PDF_PASSWORDS: ${{ secrets.PDF_PASSWORDS }}
+          BROKER_ACCOUNTS_JSON: ${{ secrets.BROKER_ACCOUNTS_JSON }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           SHEET_GID: ${{ secrets.SHEET_GID }}
