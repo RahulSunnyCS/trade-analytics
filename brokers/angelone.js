@@ -25,7 +25,7 @@ function extract(text) {
     payin_payout_obligation: rawObligation - brokerage,
     final_net: finalNet,
     net_brokerage: brokerage,
-    other_charges: finalNet - rawObligation,
+    other_charges: Math.abs(finalNet - rawObligation),
   };
 }
 
