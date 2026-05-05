@@ -36,7 +36,7 @@ async function decryptWithQpdf(filePath, password) {
   }
 }
 
-function fetchAttachmentsForSubject(imap, subjectSearch) {
+function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
   return new Promise((resolve, reject) => {
     imap.search(
       [["SINCE", formattedDate], ["SUBJECT", subjectSearch]],
@@ -52,6 +52,10 @@ function fetchAttachmentsForSubject(imap, subjectSearch) {
           msg.on("body", (stream) => {
             parsePromises.push(
               simpleParser(stream).then((parsed) => {
+                if (bodyFilterStr) {
+                  const bodyText = parsed.text || parsed.html || "";
+                  if (!bodyText.includes(bodyFilterStr)) return;
+                }
                 for (const att of parsed.attachments || []) {
                   if (
                     att.filename &&
@@ -101,13 +105,17 @@ async function processMailbox(mailbox) {
           for (const acc of mailbox.accounts) {
             const broker = getBroker(acc.broker);
             const subjectSearch = broker.subject(acc.accountId, targetDate);
+            const bodyFilterStr = broker.bodyFilter
+              ? broker.bodyFilter(targetDate)
+              : null;
             console.log(
-              `🔎 ${mailbox.email} → ${acc.broker}/${acc.accountId}: "${subjectSearch}"`
+              `🔎 ${mailbox.email} → ${acc.broker}/${acc.accountId}: "${subjectSearch}"${bodyFilterStr ? ` (body filter: "${bodyFilterStr}")` : ""}`
             );
 
             const attachments = await fetchAttachmentsForSubject(
               imap,
-              subjectSearch
+              subjectSearch,
+              bodyFilterStr
             );
             if (!attachments.length) {
               console.log(
