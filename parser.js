@@ -5,7 +5,6 @@ const { getBroker, parseFileName } = require("./brokers");
 
 const SUMMARY_FIELDS = [
   "payin_payout_obligation",
-  "final_net",
   "net_brokerage",
   "other_charges",
 ];

@@ -24,15 +24,14 @@ function letterToColumn(letter) {
   return col;
 }
 
-const ACCOUNT_COLUMN_COUNT = 5;
+const ACCOUNT_COLUMN_COUNT = 4;
 
 function buildAccountValues(match) {
   const payin = match?.payin_payout_obligation ?? 0;
   const brokerage = match?.net_brokerage ?? 0;
   const other = match?.other_charges ?? 0;
   const totalCharges = brokerage + other;
-  const finalNet = match?.final_net ?? 0;
-  return [payin, brokerage, other, totalCharges, finalNet];
+  return [payin, brokerage, other, totalCharges];
 }
 
 async function updateGoogleSheet() {
