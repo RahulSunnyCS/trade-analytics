@@ -1,8 +1,12 @@
-function subject(accountId, date) {
+function subject() {
+  return "Contract Note - Equity Segment";
+}
+
+function bodyFilter(date) {
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const yyyy = date.getFullYear();
-  return `Contract Note Cum Tax Invoice ${accountId} ${dd}/${mm}/${yyyy}`;
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 function extract(text) {
@@ -25,4 +29,4 @@ function extract(text) {
   };
 }
 
-module.exports = { subject, extract };
+module.exports = { subject, bodyFilter, extract };
