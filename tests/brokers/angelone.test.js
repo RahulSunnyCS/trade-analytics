@@ -25,6 +25,19 @@ describe("angelone.extract()", () => {
     expect(extract(sampleText).other_charges).toBeGreaterThanOrEqual(0);
   });
 
+  test("payin - (brokerage + other_charges) equals PDF final net", () => {
+    // Regression: Angel One's obligation already has brokerage deducted; payin must add it back.
+    // PDF shows Pay In/Out Obligation = -3809, Brokerage = 240, Final Net = -4005.53
+    const result = extract(sampleText);
+    const computedFinalNet = result.payin_payout_obligation - (result.net_brokerage + result.other_charges);
+    expect(computedFinalNet).toBeCloseTo(-4005.53, 1);
+  });
+
+  test("payin_payout_obligation is raw P&L before charges (obligation + brokerage added back)", () => {
+    const result = extract(sampleText);
+    expect(result.payin_payout_obligation).toBeCloseTo(-3569, 1);
+  });
+
   test("returns error when TOTAL(NET) line not present", () => {
     const result = extract(noMatchText);
     expect(result.error).toMatch(/TOTAL\(NET\) line not matched/);

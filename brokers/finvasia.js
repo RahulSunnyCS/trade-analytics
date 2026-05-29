@@ -27,9 +27,10 @@ function extract(text) {
   }
 
   return {
-    payin_payout_obligation: rawObligation - brokerage,
+    payin_payout_obligation: rawObligation,
     net_brokerage: brokerage,
-    other_charges: Math.abs(finalNet - rawObligation),
+    // |finalNet - rawObligation| spans brokerage + other charges; strip brokerage to isolate other charges
+    other_charges: Math.abs(finalNet - rawObligation) - brokerage,
   };
 }
 

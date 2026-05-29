@@ -27,6 +27,19 @@ describe("finvasia.extract()", () => {
     expect(result.other_charges).toBeGreaterThanOrEqual(0);
   });
 
+  test("payin - (brokerage + other_charges) equals PDF final net", () => {
+    // Regression: brokerage must not be double-counted.
+    // PDF shows Pay in/Payout Obligation = -9275.75, Brokerage = 160, Final Net = -10015.11
+    const result = extract(sampleText);
+    const computedFinalNet = result.payin_payout_obligation - (result.net_brokerage + result.other_charges);
+    expect(computedFinalNet).toBeCloseTo(-10015.11, 1);
+  });
+
+  test("payin_payout_obligation matches PDF obligation (brokerage not deducted from it)", () => {
+    const result = extract(sampleText);
+    expect(result.payin_payout_obligation).toBeCloseTo(-9275.75, 1);
+  });
+
   test("returns error when NSE FNO line not present", () => {
     const result = extract(noMatchText);
     expect(result.error).toMatch(/NSE FNO line not matched/);

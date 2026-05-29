@@ -42,7 +42,8 @@ function extract(text) {
   }
 
   return {
-    payin_payout_obligation: rawObligation - brokerage,
+    // Angel One's obligation already has brokerage deducted; add it back for a consistent raw P&L
+    payin_payout_obligation: rawObligation + brokerage,
     net_brokerage: brokerage,
     other_charges: Math.abs(finalNet - rawObligation),
   };
