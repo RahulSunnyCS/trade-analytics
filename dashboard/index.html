@@ -34,7 +34,8 @@
       <div class="topbar">
         <div class="brand"><span class="logo">₹</span><span class="brand-text">Trade Analytics</span></div>
         <div class="nav">
-          <button data-nav="trading" class="active">Trading</button>
+          <button data-nav="overview" class="active">Overview</button>
+          <button data-nav="trading">Trading</button>
           <button data-nav="investment">Investment</button>
           <button data-nav="settings">Settings</button>
         </div>
@@ -74,8 +75,48 @@
           <button class="btn ghost" id="csv-btn">⬇ Export CSV</button>
         </div>
 
+        <!-- ===== OVERVIEW (landing) ===== -->
+        <section id="view-overview">
+          <div class="ov-hello">
+            <h2 id="ov-greeting">Welcome back</h2>
+            <span class="muted" id="ov-asof"></span>
+          </div>
+
+          <div class="ov-section-head">
+            <h3>Trading</h3>
+            <button class="cta" data-nav="trading">View details →</button>
+          </div>
+          <div class="kpi-grid kpi-4" id="kpi-ov-trading"></div>
+          <div class="grid">
+            <div class="panel span-8">
+              <div class="panel-title">Cumulative equity curve <span class="sub">running P&amp;L</span></div>
+              <div class="chart" id="chart-ov-equity"></div>
+            </div>
+            <div class="panel span-4">
+              <div class="panel-title">Daily P&amp;L</div>
+              <div class="chart" id="chart-ov-dailypnl"></div>
+            </div>
+          </div>
+
+          <div class="ov-section-head section-gap">
+            <h3>Investment</h3>
+            <button class="cta" data-nav="investment">View details →</button>
+          </div>
+          <div class="kpi-grid kpi-4" id="kpi-ov-investment"></div>
+          <div class="grid">
+            <div class="panel span-8">
+              <div class="panel-title">Portfolio vs benchmarks <span class="sub">return %</span></div>
+              <div class="chart" id="chart-ov-portfolio"></div>
+            </div>
+            <div class="panel span-4">
+              <div class="panel-title">Allocation <span class="sub">by value</span></div>
+              <div class="chart" id="chart-ov-alloc"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- ===== TRADING ===== -->
-        <section id="view-trading">
+        <section id="view-trading" style="display: none">
           <div class="kpi-grid" id="kpi-trading"></div>
           <div class="stat-strip" id="stat-trading"></div>
 

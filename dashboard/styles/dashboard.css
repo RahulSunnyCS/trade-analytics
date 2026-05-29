@@ -165,6 +165,19 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; font-si
 .kpi-grid {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 14px;
 }
+.kpi-grid.kpi-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* ---------- overview (landing) ---------- */
+.ov-hello { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+.ov-hello h2 { font-size: 21px; }
+.ov-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ov-section-head h3 { font-size: 16px; }
+.cta {
+  border: 1px solid var(--border); background: var(--panel); color: var(--primary);
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: inherit;
+}
+.cta:hover { background: var(--primary-weak); }
+#view-overview .grid { margin-bottom: 18px; }
 .kpi {
   background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 14px 16px; box-shadow: var(--shadow);
@@ -284,10 +297,11 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; font-si
 /* ---------- responsive ---------- */
 @media (max-width: 1000px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .kpi-grid.kpi-4 { grid-template-columns: repeat(2, 1fr); }
   .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 12; }
 }
 @media (max-width: 620px) {
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-grid, .kpi-grid.kpi-4 { grid-template-columns: repeat(2, 1fr); }
   .nav button { padding: 8px 10px; }
   .brand span.brand-text { display: none; }
 }

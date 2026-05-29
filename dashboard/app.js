@@ -5,7 +5,7 @@
 
   const hasECharts = typeof echarts !== "undefined";
   const state = {
-    view: "trading",
+    view: "overview",
     dark: false,
     start: null,
     end: null,
@@ -90,21 +90,56 @@
 
   function setView(v) {
     state.view = v;
-    document.querySelectorAll("[data-nav]").forEach((b) => b.classList.toggle("active", b.dataset.nav === v));
-    ["trading", "investment", "settings"].forEach((n) => {
+    document.querySelectorAll(".nav [data-nav]").forEach((b) => b.classList.toggle("active", b.dataset.nav === v));
+    ["overview", "trading", "investment", "settings"].forEach((n) => {
       byId("view-" + n).style.display = n === v ? "block" : "none";
     });
-    byId("filterbar").style.display = v === "settings" ? "none" : "flex";
+    byId("filterbar").style.display = v === "trading" || v === "investment" ? "flex" : "none";
     byId("broker-filter-wrap").style.display = v === "trading" ? "flex" : "none";
     byId("csv-btn").style.display = v === "trading" ? "inline-flex" : "none";
     render();
   }
 
   function render() {
-    if (state.view === "trading") renderTrading();
+    if (state.view === "overview") renderOverview();
+    else if (state.view === "trading") renderTrading();
     else if (state.view === "investment") renderInvestment();
     else Settings.render(byId("view-settings"));
     requestAnimationFrame(resizeCharts);
+  }
+
+  // ---------- overview (landing) ----------
+  function renderOverview() {
+    const u = Auth.getUser() || Auth.DEMO_USER;
+    byId("ov-greeting").textContent = "Welcome back, " + (u.name ? u.name.split(" ")[0] : "trader");
+
+    const td = MOCK_TRADING.daily;
+    const tLast = td[td.length - 1];
+    byId("ov-asof").textContent = "as of " + Format.formatDate(tLast.date);
+    const tp = td.map((d) => d.profit);
+    const fyStart = Metrics.fyStartYear(tLast.date);
+    const fy = Metrics.sum(td.filter((d) => Metrics.inFY(d.date, fyStart)).map((d) => d.profit));
+    const wr = Metrics.winRate(tp);
+    const mdd = Metrics.maxDrawdown(td.map((d) => d.overall)).mdd;
+    byId("kpi-ov-trading").innerHTML = [
+      kpi("Cumulative P&L", Format.signedINR(tLast.overall), tone(tLast.overall)),
+      kpi(Metrics.fyLabel(fyStart), Format.signedINR(fy), tone(fy)),
+      kpi("Win rate", wr.rate.toFixed(1) + "%", wr.rate >= 50 ? "pos" : "neg", wr.wins + "W / " + wr.losses + "L"),
+      kpi("Max drawdown", Format.signedINR(mdd), "neg"),
+    ].join("");
+    mountChart("chart-ov-equity", () => TradingCharts.buildEquityOption(td, { dark: state.dark }));
+    mountChart("chart-ov-dailypnl", () => TradingCharts.buildDailyPnlOption(td, { dark: state.dark }));
+
+    const il = MOCK_INVESTMENT.daily[MOCK_INVESTMENT.daily.length - 1];
+    const alpha = il.total.percentage - il.nifty.percentage;
+    byId("kpi-ov-investment").innerHTML = [
+      kpi("Total P&L", Format.signedINR(il.total.profit), tone(il.total.profit)),
+      kpi("Total return", Format.formatPct(il.total.percentage), tone(il.total.percentage)),
+      kpi("Alpha vs Nifty", Format.formatPct(alpha), tone(alpha), "Nifty " + Format.formatPct(il.nifty.percentage)),
+      kpi("Today Δ", Format.formatPct(il.total.dailyChange), tone(il.total.dailyChange)),
+    ].join("");
+    mountChart("chart-ov-portfolio", () => InvestmentCharts.buildPortfolioVsBenchmarkOption(MOCK_INVESTMENT.daily, { dark: state.dark }));
+    mountChart("chart-ov-alloc", () => InvestmentCharts.buildAllocationOption(MOCK_INVESTMENT.daily, { dark: state.dark }));
   }
 
   // ---------- trading ----------
