@@ -22,6 +22,20 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
 const mailboxes = loadBrokerAccounts();
 
+// Opt-in escape hatch for environments that present a self-signed/intercepted
+// TLS certificate (e.g. a proxy in CI). Default off => certificate
+// verification stays on. Accepts "1", "true" or "yes" (case-insensitive).
+function tlsInsecureEnabled() {
+  const v = (process.env.IMAP_TLS_INSECURE || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}
+
+if (tlsInsecureEnabled()) {
+  logger.warn("IMAP TLS certificate verification DISABLED", {
+    reason: "IMAP_TLS_INSECURE set",
+  });
+}
+
 function decryptWithQpdf(filePath, password) {
   const decryptedPath = filePath.replace(/\.pdf$/i, "_decrypted.pdf");
   try {
@@ -97,6 +111,14 @@ async function processMailbox(mailbox) {
       host: "imap.gmail.com",
       port: 993,
       tls: true,
+      tlsOptions: {
+        servername: "imap.gmail.com",
+        // Verification stays ON by default. Only skip it when IMAP_TLS_INSECURE
+        // is explicitly enabled, e.g. when the network terminates TLS with a
+        // self-signed/intercepting certificate that would otherwise abort the
+        // handshake with a "self-signed certificate" error.
+        rejectUnauthorized: !tlsInsecureEnabled(),
+      },
       connTimeout: 30000,
       authTimeout: 15000,
     });
