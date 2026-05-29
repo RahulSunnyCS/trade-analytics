@@ -3,13 +3,14 @@ const Imap = require("imap");
 const { simpleParser } = require("mailparser");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
-const {
-  loadBrokerAccounts,
-  getBroker,
-  makeFileName,
-} = require("./brokers");
+const { loadBrokerAccounts, getBroker, makeFileName } = require("./brokers");
+const { requireEnv } = require("./utils/validate");
+const { withRetry } = require("./utils/retry");
+const logger = require("./utils/logger");
+
+requireEnv(["BROKER_ACCOUNTS_JSON"]);
 
 const targetDate = process.env.TARGET_DATE
   ? new Date(process.env.TARGET_DATE)
@@ -21,18 +22,19 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
 
 const mailboxes = loadBrokerAccounts();
 
-async function decryptWithQpdf(filePath, password) {
+function decryptWithQpdf(filePath, password) {
   const decryptedPath = filePath.replace(/\.pdf$/i, "_decrypted.pdf");
   try {
-    execSync(
-      `qpdf --password='${password}' --decrypt "${filePath}" "${decryptedPath}"`,
-      { stdio: "ignore" }
+    execFileSync(
+      "qpdf",
+      [`--password=${password}`, "--decrypt", filePath, decryptedPath],
+      { stdio: "ignore", timeout: 30000 }
     );
-    console.log("🔓 PDF decrypted using qpdf:", decryptedPath);
-    return decryptedPath;
+    logger.info("PDF decrypted", { file: path.basename(decryptedPath) });
+    return { path: decryptedPath, error: null };
   } catch (err) {
-    console.error("❌ qpdf failed to decrypt:", filePath, err.message);
-    return null;
+    logger.error("qpdf failed to decrypt", err, { file: path.basename(filePath) });
+    return { path: null, error: err.message };
   }
 }
 
@@ -57,10 +59,7 @@ function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
                   if (!bodyText.includes(bodyFilterStr)) return;
                 }
                 for (const att of parsed.attachments || []) {
-                  if (
-                    att.filename &&
-                    att.filename.toLowerCase().endsWith(".pdf")
-                  ) {
+                  if (att.filename && att.filename.toLowerCase().endsWith(".pdf")) {
                     attachments.push(att);
                   }
                 }
@@ -74,8 +73,8 @@ function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
           try {
             await Promise.all(parsePromises);
             resolve(attachments);
-          } catch (err) {
-            reject(err);
+          } catch (parseErr) {
+            reject(parseErr);
           }
         });
       }
@@ -84,14 +83,22 @@ function fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr) {
 }
 
 async function processMailbox(mailbox) {
-  return new Promise((resolve, reject) => {
+  const result = {
+    email: mailbox.email,
+    succeeded: [],
+    failed: [],
+    errors: [],
+  };
+
+  await new Promise((resolve, reject) => {
     const imap = new Imap({
       user: mailbox.email,
       password: mailbox.emailPassword,
       host: "imap.gmail.com",
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
+      connTimeout: 30000,
+      authTimeout: 15000,
     });
 
     imap.once("ready", () => {
@@ -101,68 +108,94 @@ async function processMailbox(mailbox) {
           return reject(err);
         }
 
-        try {
-          for (const acc of mailbox.accounts) {
+        for (const acc of mailbox.accounts) {
+          try {
             const broker = getBroker(acc.broker);
             const subjectSearch = broker.subject(acc.accountId, targetDate);
-            const bodyFilterStr = broker.bodyFilter
-              ? broker.bodyFilter(targetDate)
-              : null;
-            console.log(
-              `🔎 ${mailbox.email} → ${acc.broker}/${acc.accountId}: "${subjectSearch}"${bodyFilterStr ? ` (body filter: "${bodyFilterStr}")` : ""}`
-            );
+            const bodyFilterStr = broker.bodyFilter ? broker.bodyFilter(targetDate) : null;
+            logger.info(`Searching mail`, {
+              email: mailbox.email,
+              broker: acc.broker,
+              account: acc.accountId,
+              subject: subjectSearch,
+            });
 
-            const attachments = await fetchAttachmentsForSubject(
-              imap,
-              subjectSearch,
-              bodyFilterStr
-            );
+            const attachments = await fetchAttachmentsForSubject(imap, subjectSearch, bodyFilterStr);
             if (!attachments.length) {
-              console.log(
-                `📭 No mail for ${acc.broker}/${acc.accountId} in ${mailbox.email}`
-              );
+              logger.info("No mail found", { broker: acc.broker, account: acc.accountId });
               continue;
             }
 
             for (const att of attachments) {
-              const filename = makeFileName(
-                mailbox.email,
-                acc.broker,
-                acc.accountId,
-                att.filename
-              );
+              const filename = makeFileName(mailbox.email, acc.broker, acc.accountId, att.filename);
               const filePath = path.join(dataDir, filename);
-              fs.writeFileSync(filePath, att.content);
-              console.log(`📎 Saved attachment: ${filename}`);
-              await decryptWithQpdf(filePath, acc.pdfPassword);
+              try {
+                fs.writeFileSync(filePath, att.content);
+                logger.info("Attachment saved", { file: filename });
+              } catch (writeErr) {
+                logger.error("Failed to save attachment", writeErr, { file: filename });
+                result.failed.push(acc.accountId);
+                result.errors.push({ account: acc.accountId, error: writeErr.message });
+                continue;
+              }
+              const decryptResult = decryptWithQpdf(filePath, acc.pdfPassword);
+              if (decryptResult.error) {
+                result.failed.push(acc.accountId);
+                result.errors.push({ account: acc.accountId, error: decryptResult.error });
+              } else {
+                result.succeeded.push(acc.accountId);
+              }
             }
+          } catch (accErr) {
+            logger.error(`Account processing failed`, accErr, { account: acc.accountId });
+            result.failed.push(acc.accountId);
+            result.errors.push({ account: acc.accountId, error: accErr.message });
           }
-
-          console.log(`✅ Finished processing ${mailbox.email}`);
-          imap.end();
-          resolve();
-        } catch (err) {
-          imap.end();
-          reject(err);
         }
+
+        imap.end();
+        resolve();
       });
     });
 
     imap.once("error", (err) => {
-      console.error(`❌ IMAP error for ${mailbox.email}: ${err.message}`);
+      logger.error(`IMAP error`, err, { email: mailbox.email });
       reject(err);
     });
 
     imap.connect();
   });
+
+  return result;
 }
 
 (async () => {
+  const summary = [];
   for (const mb of mailboxes) {
     try {
-      await processMailbox(mb);
+      const result = await withRetry(() => processMailbox(mb), {
+        attempts: 3,
+        baseDelayMs: 2000,
+        retryIf: (err) => !err.message.includes("Invalid credentials"),
+        onRetry: (err, attempt, delay) =>
+          logger.warn(`IMAP retry`, { email: mb.email, attempt, delayMs: delay, error: err.message }),
+      });
+      summary.push(result);
     } catch (err) {
-      console.error(`⚠️ Failed for ${mb.email}: ${err.message}`);
+      logger.error(`Mailbox processing failed after retries`, err, { email: mb.email });
+      summary.push({ email: mb.email, succeeded: [], failed: ["all"], errors: [{ error: err.message }] });
     }
   }
+
+  logger.info("=== Fetch summary ===");
+  for (const s of summary) {
+    logger.info(`Mailbox result`, {
+      email: s.email,
+      succeeded: s.succeeded.join(",") || "none",
+      failed: s.failed.join(",") || "none",
+    });
+  }
+
+  const anyFailed = summary.some((s) => s.failed.length > 0);
+  if (anyFailed) process.exit(1);
 })();

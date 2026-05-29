@@ -6,19 +6,31 @@ function subject(accountId, date) {
 }
 
 function extract(text) {
+  if (!text) return { error: "Finvasia extract received empty text" };
+
   const pattern =
     /NSE\s*FNO(?:\s*-\s*\w+)?\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)/;
   const match = text.match(pattern);
-  if (!match) return { error: "Finvasia NSE FNO line not matched" };
+  if (!match) {
+    const snippet = text.slice(0, 500).replace(/\n/g, " ");
+    return { error: `Finvasia NSE FNO line not matched. Text preview: ${snippet}` };
+  }
 
   const rawObligation = parseFloat(match[8]);
   const finalNet = parseFloat(match[7]);
   const brokerage = parseFloat(match[10]);
 
+  if (!isFinite(rawObligation) || !isFinite(finalNet) || !isFinite(brokerage)) {
+    return {
+      error: `Finvasia parsed NaN field(s): rawObligation=${rawObligation} finalNet=${finalNet} brokerage=${brokerage}`,
+    };
+  }
+
   return {
-    payin_payout_obligation: rawObligation - brokerage,
+    payin_payout_obligation: rawObligation,
     net_brokerage: brokerage,
-    other_charges: Math.abs(finalNet - rawObligation),
+    // |finalNet - rawObligation| spans brokerage + other charges; strip brokerage to isolate other charges
+    other_charges: Math.abs(finalNet - rawObligation) - brokerage,
   };
 }
 
