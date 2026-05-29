@@ -6,6 +6,11 @@ describe("parseDateCell()", () => {
     expect(d.toISOString().slice(0, 10)).toBe("2025-04-30");
   });
 
+  test("parses space-separated format written by updateSheet.js", () => {
+    const d = parseDateCell("26 May 26");
+    expect(d.toISOString().slice(0, 10)).toBe("2026-05-26");
+  });
+
   test("handles single-digit day", () => {
     const d = parseDateCell("1-May-25");
     expect(d.toISOString().slice(0, 10)).toBe("2025-05-01");
