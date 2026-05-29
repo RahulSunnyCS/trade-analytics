@@ -107,6 +107,7 @@ The rest of the pipeline (`fetchMail.js`, `parser.js`, `updateSheet.js`, `checkD
 | `GOOGLE_SHEET_ID` | Google Sheet ID from URL |
 | `SHEET_GID` | Numeric GID of the target tab |
 | `SHEET_NAME` | Name of the target tab |
+| `IMAP_TLS_INSECURE` | (Optional) Set to `1`/`true`/`yes` to disable TLS certificate verification on the Gmail IMAP connection in `fetchMail.js`. Defaults to off (verification on). Use only when the network terminates TLS with a self-signed/intercepting certificate (e.g. a CI proxy) that would otherwise abort the handshake with a `self-signed certificate` error. In CI it is wired from the `IMAP_TLS_INSECURE` repository **variable**. |
 
 `TARGET_DATE` (optional) overrides the default of yesterday (`YYYY-MM-DD` format).
 
