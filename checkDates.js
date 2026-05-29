@@ -14,8 +14,8 @@ const MONTHS = {
 };
 
 function parseDateCell(str) {
-  // Parses "01-May-25" or "1-May-25" → UTC midnight Date
-  const [dd, mon, yy] = str.split("-");
+  // Handles both "26 May 26" (space-separated, written by updateSheet.js) and "01-May-25" (dash-separated)
+  const [dd, mon, yy] = str.split(/[\s-]+/);
   const month = MONTHS[mon];
   if (month === undefined) throw new Error(`Unknown month abbreviation: "${mon}"`);
   return new Date(Date.UTC(2000 + parseInt(yy, 10), month, parseInt(dd, 10)));
