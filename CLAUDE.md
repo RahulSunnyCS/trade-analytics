@@ -38,7 +38,7 @@ Gmail (IMAP) → fetchMail.js → data/*.pdf (encrypted)
                         updateSheet.js → Google Sheet row
 ```
 
-**`brokers/`** — Per-broker plugins. Each plugin exports `subject(accountId, date)` (the IMAP `SUBJECT` search string for that broker's contract-note emails) and `extract(text)` (returns `{ payin_payout_obligation, final_net, net_brokerage }` from decrypted PDF text). `brokers/index.js` is the registry plus the `BROKER_ACCOUNTS_JSON` config loader and the filename helpers (`makeFileName` / `parseFileName`).
+**`brokers/`** — Per-broker plugins. Each plugin exports `subject(accountId, date)` (the IMAP `SUBJECT` search string for that broker's contract-note emails) and `extract(text)` (returns `{ payin_payout_obligation, net_brokerage, other_charges }` from decrypted PDF text; `total_charges` and `final_net` are derived later by `updateSheet.js`). `brokers/index.js` is the registry plus the `BROKER_ACCOUNTS_JSON` config loader and the filename helpers (`makeFileName` / `parseFileName`).
 
 **`fetchMail.js`** — Loads `BROKER_ACCOUNTS_JSON`, opens **one IMAP connection per email**, then iterates the broker accounts inside that mailbox. For each account it runs the broker-specific subject search, saves attachments as `<safeEmail>__<broker>__<accountId>__<originalName>.pdf`, and decrypts via the system `qpdf` binary using `pdfPassword` from the same account entry.
 
@@ -82,7 +82,7 @@ A single env var holds a JSON array of mailboxes. Each mailbox has one Gmail log
 | 1 | `E` | `net_brokerage` |
 | 2 | `F` | `other_charges` |
 | 3 | `G` | `total_charges` (= `net_brokerage + other_charges`, computed by `updateSheet.js`) |
-| 4 | `H` | `final_net` |
+| 4 | `H` | `final_net` (= `payin_payout_obligation - total_charges`, computed by `updateSheet.js`) |
 
 Columns A–C are reserved for serial number / day name / formatted date. Pick `sheetStartColumn` for each account so the per-account 5-column blocks don't overlap; gaps between blocks (and any cells with formulas) are preserved from the previous row via `PASTE_FORMULA`.
 

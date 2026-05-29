@@ -27,14 +27,15 @@ function letterToColumn(letter) {
   return col;
 }
 
-const ACCOUNT_COLUMN_COUNT = 4;
+const ACCOUNT_COLUMN_COUNT = 5;
 
 function buildAccountValues(match) {
   const payin = match?.payin_payout_obligation ?? 0;
   const brokerage = match?.net_brokerage ?? 0;
   const other = match?.other_charges ?? 0;
   const totalCharges = brokerage + other;
-  return [payin, brokerage, other, totalCharges];
+  const finalNet = payin - totalCharges;
+  return [payin, brokerage, other, totalCharges, finalNet];
 }
 
 const sheetsRetryOpts = {

@@ -35,13 +35,14 @@ describe("letterToColumn()", () => {
 });
 
 describe("buildAccountValues()", () => {
-  test("returns four numbers from a full match", () => {
+  test("returns five values [payin, brokerage, other, total, final] from a full match", () => {
     const vals = buildAccountValues({
       payin_payout_obligation: 100,
       net_brokerage: 20,
       other_charges: 5,
     });
-    expect(vals).toEqual([100, 20, 5, 25]);
+    // total = 20 + 5 = 25; final = payin - total = 100 - 25 = 75
+    expect(vals).toEqual([100, 20, 5, 25, 75]);
   });
 
   test("totalCharges = net_brokerage + other_charges", () => {
@@ -53,16 +54,27 @@ describe("buildAccountValues()", () => {
     expect(total).toBe(brokerage + other);
   });
 
+  test("final_net = payin - total_charges", () => {
+    const [payin, , , total, finalNet] = buildAccountValues({
+      payin_payout_obligation: -9275.75,
+      net_brokerage: 160,
+      other_charges: 579.36,
+    });
+    expect(finalNet).toBeCloseTo(payin - total, 2);
+    expect(finalNet).toBeCloseTo(-10015.11, 2);
+  });
+
   test("defaults all to zero when match is undefined", () => {
-    expect(buildAccountValues(undefined)).toEqual([0, 0, 0, 0]);
+    expect(buildAccountValues(undefined)).toEqual([0, 0, 0, 0, 0]);
   });
 
   test("defaults all to zero when match is null", () => {
-    expect(buildAccountValues(null)).toEqual([0, 0, 0, 0]);
+    expect(buildAccountValues(null)).toEqual([0, 0, 0, 0, 0]);
   });
 
   test("handles missing fields with zero fallback", () => {
     const vals = buildAccountValues({ payin_payout_obligation: 50 });
-    expect(vals).toEqual([50, 0, 0, 0]);
+    // total = 0; final = 50 - 0 = 50
+    expect(vals).toEqual([50, 0, 0, 0, 50]);
   });
 });
