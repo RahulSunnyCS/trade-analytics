@@ -1,86 +1,116 @@
-# Trade Analytics — Dashboard (standalone prototype)
+# Trade Analytics — Dashboard (Next.js)
 
-A self-contained HTML dashboard over the **trading** (realized P&L from contract notes) and
-**investment** (portfolio vs benchmarks) data. This is the **look-and-feel prototype**; the end goal
-is a Next.js/React app in this same `/dashboard` folder (see *Migration* below). All numbers here are
-**mock**, but the shapes mirror what the real backend can produce so the swap to live data is local.
+Next.js 14 (App Router) + TypeScript dashboard for the Trade Analytics pipeline. Replaces the
+standalone HTML/JS prototype that previously lived in this folder.
 
-## Open it
+## Quickstart
 
-No build step. Either:
-
-- **Double-click `index.html`** (opens from `file://`), or
-- Serve the folder: `python3 -m http.server 8000 --directory dashboard` then visit
-  `http://localhost:8000/`.
-
-ECharts loads from a CDN, so the first load needs internet. (The Next.js round switches to the
-`echarts` npm package.)
-
-1. You land on a **mock "Sign in with Google"** gate — click it (no real account is used).
-2. Use the top nav to switch **Trading · Investment · Settings**.
-
-## What's mock vs. realistically achievable
-
-| Area | Status | Real source later |
-|---|---|---|
-| Trading daily P&L, charges, cumulative, drawdown, rolling avgs, ratios, monthly | **Mock, fully achievable** | The Google Sheet the pipeline already writes (`updateSheet.js`) |
-| Per-broker split (Finvasia/Angel) | **Mock, achievable** | Per-account `final_net` columns in the Sheet |
-| Investment portfolio vs benchmarks (Indian/US/Satellite vs Nifty/MidCap/SmallCap) | **Mock, achievable** | `Trade Analytics.xlsx → Investment` tab |
-| Per-broker **holdings** table (Shoonya×2, Angel, Fyers, Kite) | **Mock — no live source yet** | A GOOGLEFINANCE holdings sheet or broker APIs |
-| Google sign-in | **Mock** | Google Identity Services / Auth.js |
-| Accounts settings | **Mock (localStorage)** | A real secret store / `BROKER_ACCOUNTS_JSON` |
-
-## Files
-
-```
-index.html            shell: login gate, nav, KPI/chart/table containers, script load order
-app.js                auth guard, view routing, filters, KPI computation, chart lifecycle, CSV
-auth.js               mock Google sign-in (localStorage)
-settings.js           Accounts CRUD over the BROKER_ACCOUNTS_JSON shape (localStorage + JSON import/export)
-charts/trading.js     pure build*Option() chart builders + shared ChartKit theme
-charts/investment.js  pure build*Option() chart builders
-lib/metrics.js        cumulative, drawdown, win rate, streaks, rolling, FY buckets, day-of-week, Sharpe proxy
-lib/format.js         ₹ (lakh/crore), %, bps, date formatters
-data/mock-trading.js  MOCK_TRADING + TradingModel.build() (recompute on filter)
-data/mock-investment.js  MOCK_INVESTMENT (daily series + holdings)
-data/mock-accounts.js seed config for Settings
-styles/dashboard.css  light/dark theme, 12-col grid, cards, tables
+```bash
+cd dashboard
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-## Data schema (mirrors the real fields)
+Other scripts:
 
-- **Trading day** (`MOCK_TRADING.daily[]`): `date, day, profit` (= Σ `final_net`), `overall` (cumsum),
-  `drawdown` (≤0), `charges, algos, algoCharges, avgProfit50, avgProfit100, avgCharge100,
-  chargeProfitRatio, capital, profitCapitalBps`.
-- **Per-broker day** (`MOCK_TRADING.brokers[]`): the exact pipeline fields —
-  `date, broker, accountId, payin_payout_obligation, net_brokerage, other_charges, total_charges, final_net`.
-- **Monthly** (`MOCK_TRADING.monthly[]`): `month, tradingGain, gainPct, gainAvg3m`.
-- **Investment day** (`MOCK_INVESTMENT.daily[]`): `date` + 7 entities `{indian, us, satellite, total,
-  nifty, midcap, smallcap}`, each `{profit, percentage, dailyChange}`.
-- **Holding** (`MOCK_INVESTMENT.holdings[]`): `broker, symbol, qty, avgCost, ltp, invested, currentValue,
-  unrealizedPnl, dayChangePct, _source`.
+```bash
+npm run build      # production build
+npm run start      # serve the production build
+npm run typecheck  # tsc --noEmit
+npm run lint       # next lint
+```
 
-## Google Sheet column map (trading, from `updateSheet.js`)
+## Environment
 
-`A` serial · `B` day · `C` date, then a 5-column block per account starting at `sheetStartColumn`:
-`[payin_payout_obligation, net_brokerage, other_charges, total_charges (=brokerage+other),
-final_net (=payin−total_charges)]`.
+Copy `.env.example` to `.env.local` and fill the values. All env vars are server-side only;
+nothing is shipped to the browser.
 
-## Features
+| Var | Purpose |
+|---|---|
+| `GOOGLE_CREDENTIALS`     | Base64-encoded service-account JSON (same value the pipeline uses) |
+| `GOOGLE_SHEET_ID`        | Spreadsheet ID (from the sheet URL)                                |
+| `SHEET_GID`              | Numeric GID of the target tab                                      |
+| `SHEET_NAME`             | Tab name as it appears in the spreadsheet                          |
+| `BROKER_ACCOUNTS_JSON`   | JSON array of mailboxes + accounts (same shape as the pipeline)    |
 
-Mock Google sign-in · Accounts settings · date-range filter · FY/YTD presets · broker filter ·
-KPI cards · best/worst day · win/loss streaks · day-of-week performance · cumulative equity ·
-drawdown · daily P&L + rolling avg · per-broker split · monthly returns · charge efficiency ·
-P&L calendar heatmap · benchmark alpha · allocation donut · return comparison · daily-change
-histogram · holdings table · CSV export · dark mode.
+**Live vs mock fallback.** If any of `GOOGLE_CREDENTIALS`, `GOOGLE_SHEET_ID`, `SHEET_NAME`, or
+`BROKER_ACCOUNTS_JSON` is missing — or the Sheets call fails for any reason — `/api/trading`
+and the server pages silently fall back to the deterministic mock generator in
+`lib/mocks/trading.ts`. The Trading and Overview views show a banner when this happens.
 
-*Sharpe is a daily-return-based proxy, not a true Sharpe ratio.*
+The Investment view is mock-only for now (`lib/mocks/investment.ts`); it has no live source yet.
+The Settings page is localStorage-only.
 
-## Migration to Next.js (next round)
+## Project layout
 
-Each `build*Option(data)` is pure and lifts verbatim into `lib/charts/*.ts`, rendered by
-`<ReactECharts option={...} />`. `lib/metrics` and `lib/format` port unchanged. `app/trading/page.tsx`
-and `app/investment/page.tsx` become server components calling `getTradingData()` / `getInvestmentData()`,
-which reuse the service-account JWT auth from `updateSheet.js` (base64 `GOOGLE_CREDENTIALS` → `googleapis`
-sheets v4). The mock files become fixtures/fallback; the mock sign-in becomes Auth.js (Google), and
-Settings writes to a real secret store instead of `localStorage`.
+```
+dashboard/
+  app/
+    layout.tsx                 # root layout: ThemeProvider + AppShell + globals.css
+    page.tsx                   # / Overview (server: loads sheet → mock fallback)
+    trading/page.tsx           # /trading
+    investment/page.tsx        # /investment
+    settings/page.tsx          # /settings  (client-only)
+    globals.css                # ported from styles/dashboard.css
+    api/
+      trading/route.ts         # GET → { records: BrokerRecord[], source: "sheet"|"mock" }
+      investment/route.ts      # GET → MOCK_INVESTMENT
+  components/
+    AppShell.tsx               # topbar, nav, user menu — wraps AuthGate
+    AuthGate.tsx               # localStorage user gate, exposes useUser()
+    LoginGate.tsx              # mock "Sign in with Google" card
+    ThemeProvider.tsx          # data-theme attr + localStorage("ta_dash_theme")
+    Chart.tsx                  # ECharts wrapper (ref + ResizeObserver)
+    FilterBar.tsx              # date range / preset / broker / CSV
+    KpiGrid.tsx, StatStrip.tsx # presentational cards
+    TradingTable.tsx           # daily detail table + CSV helpers
+    HoldingsTable.tsx          # per-broker grouped holdings
+    OverviewView.tsx
+    TradingView.tsx
+    InvestmentView.tsx
+    SettingsView.tsx           # mailbox/account CRUD over localStorage
+  lib/
+    format.ts                  # INR, %, bps, dates
+    metrics.ts                 # sum/mean/std/cumulative/drawdown/winRate/streaks/...
+    chartkit.ts                # ECharts theme + BROKER_NAMES
+    charts/trading.ts          # pure (data, opts) => EChartsOption
+    charts/investment.ts       # pure (data, opts) => EChartsOption
+    auth.ts                    # mock Google sign-in (localStorage)
+    trading-model.ts           # buildTradingModel(records, capital)
+    sheets.ts                  # SERVER ONLY — Google Sheets loader
+    mocks/{trading,investment,accounts}.ts
+  types/index.ts               # BrokerRecord, TradingDay, InvestmentDay, Holding, Mailbox, ...
+```
+
+## Data flow
+
+1. The Overview and Trading pages are React Server Components. They call
+   `getTradingBrokerRecords()` (`lib/sheets.ts`) which either reads the configured Google Sheet
+   or returns the deterministic mock from `lib/mocks/trading.ts`.
+2. The page serializes the result and passes `initialRecords` (or the built model) into a
+   client component (`TradingView` / `OverviewView`).
+3. The client computes `buildTradingModel(filteredRecords, CAPITAL)` on every filter change via
+   `useMemo` — no further server hops.
+4. The Investment page hands the mock `{ daily, holdings }` straight into `InvestmentView`.
+5. Charts are rendered by the `<Chart option={...} />` wrapper which mounts a single
+   `echarts.init()` instance per element and re-applies `setOption(option, true)` whenever the
+   memoized option changes.
+
+## Adding a chart
+
+1. Add a pure builder to `lib/charts/trading.ts` or `lib/charts/investment.ts`:
+   ```ts
+   export function buildMyOption(data: TradingDay[], opts: ChartOpts = {}): any { ... }
+   ```
+   The builder must not touch the DOM — only return an EChartsOption-compatible object.
+2. Import it in `TradingView.tsx` or `InvestmentView.tsx`, memoize the result against
+   `{ daily, dark }`, and render with `<Chart option={memoizedOpt} />`.
+
+## Migration notes
+
+This Next.js app replaced the standalone HTML/JS prototype (`index.html`, `app.js`, `auth.js`,
+`settings.js`, `charts/`, `data/`, `lib/*.js`, `styles/`) in a single commit on the
+`claude/inspiring-albattani-FeET4` branch. The prototype is preserved in git history.
+
+The repo root pipeline (`fetchMail.js`, `parser.js`, `updateSheet.js`, `checkDates.js`,
+`brokers/`) is unchanged — this app only **reads** from the Sheet the pipeline writes to.
