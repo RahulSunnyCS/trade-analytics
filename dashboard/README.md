@@ -22,14 +22,17 @@ npm run lint       # next lint
 
 ## Environment
 
-Copy `.env.example` to `.env.local` and fill the values. All env vars are server-side only;
+Env vars come from the **repo-root `.env`** — the same file the pipeline uses. `next.config.js`
+loads it via `dotenv` so `next dev`, `next build`, and `next start` all see the same values. Copy
+`../.env.example` to `../.env` and fill in real values. All env vars are server-side only;
 nothing is shipped to the browser.
+
+The dashboard uses a subset of the pipeline's vars:
 
 | Var | Purpose |
 |---|---|
 | `GOOGLE_CREDENTIALS`     | Base64-encoded service-account JSON (same value the pipeline uses) |
 | `GOOGLE_SHEET_ID`        | Spreadsheet ID (from the sheet URL)                                |
-| `SHEET_GID`              | Numeric GID of the target tab                                      |
 | `SHEET_NAME`             | Tab name as it appears in the spreadsheet                          |
 | `BROKER_ACCOUNTS_JSON`   | JSON array of mailboxes + accounts (same shape as the pipeline)    |
 
