@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download row-tracker from previous successful workflow run (if exists)
         run: |
@@ -55,7 +55,7 @@ jobs:
           mv ./row-tracker/row_tracker_updated.json ./row-tracker/row_tracker.json
 
       - name: Upload updated artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: row-tracker
           path: ./row-tracker/row_tracker.json
