@@ -4,13 +4,13 @@
 
 This project consists of three main scripts:
 
-- **fetchMail.js**  
+- **fetchMail.ts**  
   Fetches emails from multiple Gmail accounts using the provided credentials and filters the emails based on specific criteria (e.g., subject line, sender).
 
-- **parse.js**  
+- **parser.ts**  
   Parses the fetched email content to extract relevant trade-related data in a structured format (like trade entries, exits, quantities, etc.).
 
-- **sheetUpdate.js**  
+- **updateSheet.ts**  
   Updates a Google Sheet with the parsed data, appending new rows or updating existing ones based on the extracted information.
 
 ---
