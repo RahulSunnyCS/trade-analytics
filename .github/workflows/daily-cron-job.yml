@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Download row-tracker from previous successful workflow run (if exists)
         run: |
@@ -38,7 +38,7 @@ jobs:
         shell: bash
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
 
@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload updated row_tracker.json as artifact
         if: env.updated == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: row-tracker
           path: row_tracker.json

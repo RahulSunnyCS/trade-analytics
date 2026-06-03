@@ -97,6 +97,10 @@ async function processMailbox(mailbox) {
       host: "imap.gmail.com",
       port: 993,
       tls: true,
+      tlsOptions: {
+        servername: "imap.gmail.com",
+        minVersion: "TLSv1.2",
+      },
       connTimeout: 30000,
       authTimeout: 15000,
     });
