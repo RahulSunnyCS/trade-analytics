@@ -1,8 +1,14 @@
 name: Daily Trading Data Processing
 
 on:
-  schedule:
-    - cron: "1 0 * * *"
+  # SCHEDULE DISABLED — this pipeline has moved to the ai-trading-agent monorepo
+  # at packages/contract-notes. Merging this branch to main is step 1 of the
+  # cutover; see docs/runbooks/contract-notes-handover.md in that repo.
+  #
+  # Leave workflow_dispatch enabled: if the monorepo run misbehaves, this is the
+  # rollback — re-enable the cron here and the old pipeline resumes unchanged.
+  # schedule:
+  #   - cron: "1 0 * * *"
   workflow_dispatch:
 
 permissions:
