@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Related Systems
+
+This repo was merged into the `ai-trading-agent` monorepo via `git subtree`
+(history preserved) on 2026-09-19, becoming `packages/contract-notes` there.
+The merge is not yet a cutover:
+
+- **This repo (`trade-analytics`)** still owns the live daily cron
+  (`.github/workflows/` below) and is the version actually running in
+  production right now.
+- **`RahulSunnyCS/ai-trading-agent`'s `packages/contract-notes`** is where
+  new work should land going forward, but its own daily schedule is
+  disabled pending cutover — see that repo's `docs/algotest-execution.md`
+  for the full cutover plan, checklist, and rollback.
+
+Until cutover completes, treat this as two copies of the same pipeline: a
+fix made only in the monorepo copy will not reach production here. This
+repo will eventually be archived once the cutover checklist is done.
+
+Its sibling repo is `RahulSunnyCS/algo-automation` (merged into the same
+monorepo as `packages/broker-login`, same cutover status).
+
 ## Commands
 
 ```bash
